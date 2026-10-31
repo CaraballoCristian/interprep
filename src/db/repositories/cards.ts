@@ -1,11 +1,12 @@
-import { sql } from "drizzle-orm";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type {
   CardInsert,
   CardUpdate,
   ExistingCard,
 } from "@lib/import/plan";
-import type { CardResult } from "@lib/types";
+import type { CardSnapshot } from "@lib/study/history";
+import type { StudyCard } from "@lib/study/types";
+import type { CardResult, CardStatus } from "@lib/types";
 import { getDb } from "../client";
 import { cards } from "../schema";
 
@@ -88,4 +89,85 @@ export function applyImportPlan(plan: {
   });
 
   return { inserted: plan.inserts.length, updated: plan.updates.length };
+}
+
+const studyCardColumns = {
+  id: cards.id,
+  category: cards.category,
+  termEng: cards.termEng,
+  termEsp: cards.termEsp,
+  description: cards.description,
+  status: cards.status,
+  hidden: cards.hidden,
+  history: cards.history,
+  totalSuccess: cards.totalSuccess,
+  totalFail: cards.totalFail,
+};
+
+export function listStudyCards(): StudyCard[] {
+  return getDb().select(studyCardColumns).from(cards).all();
+}
+
+export function getStudyCard(id: string): StudyCard | null {
+  const row = getDb()
+    .select(studyCardColumns)
+    .from(cards)
+    .where(eq(cards.id, id))
+    .get();
+  return row ?? null;
+}
+
+export function updateCardResult(
+  id: string,
+  result: {
+    history: CardResult[];
+    totalSuccess: number;
+    totalFail: number;
+  },
+): void {
+  getDb()
+    .update(cards)
+    .set({
+      history: result.history,
+      totalSuccess: result.totalSuccess,
+      totalFail: result.totalFail,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(cards.id, id))
+    .run();
+}
+
+export function updateCardStatus(id: string, status: CardStatus): void {
+  getDb()
+    .update(cards)
+    .set({ status, updatedAt: new Date().toISOString() })
+    .where(eq(cards.id, id))
+    .run();
+}
+
+export function updateCardHidden(id: string, hidden: boolean): void {
+  getDb()
+    .update(cards)
+    .set({ hidden, updatedAt: new Date().toISOString() })
+    .where(eq(cards.id, id))
+    .run();
+}
+
+/** Restores the fields captured by an undo snapshot. */
+export function restoreCardFields(
+  id: string,
+  snapshot: CardSnapshot,
+): void {
+  getDb()
+    .update(cards)
+    .set({
+      history: snapshot.history,
+      totalSuccess: snapshot.totalSuccess,
+      totalFail: snapshot.totalFail,
+      status: snapshot.status,
+      hidden: snapshot.hidden,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(cards.id, id))
+    .run();
 }

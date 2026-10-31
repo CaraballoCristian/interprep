@@ -22,6 +22,12 @@ export default function Home() {
         <div className="mt-4 flex flex-wrap gap-3">
           <a
             className="inline-flex min-h-12 items-center justify-center rounded-xl bg-accent px-5 text-sm font-semibold text-accent-foreground"
+            href="/study"
+          >
+            Estudiar
+          </a>
+          <a
+            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-border px-5 text-sm font-medium"
             href="/import"
           >
             Importar tarjetas

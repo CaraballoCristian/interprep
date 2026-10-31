@@ -96,6 +96,33 @@ Pantalla `/import`: se sube un CSV/TSV o se pega el texto.
   oculta, historial y contadores. Las tarjetas que no están en el archivo se
   conservan.
 
+## Estudio
+
+Pantalla `/study`, mobile-first y usable a 360px:
+
+- La tarjeta se voltea tocándola (o con `Espacio`/`Enter`). Los resultados
+  (`Acierto`/`Fallo`) solo se registran con la tarjeta volteada.
+- **Gestos**: swipe a la derecha = acierto, a la izquierda = fallo (solo con la
+  tarjeta volteada), swipe hacia arriba = ocultar. Los botones visibles hacen
+  lo mismo, sin depender del gesto.
+- **Estado manual**: selector `Nueva / Aprendiendo / Aprendida` dentro de la
+  tarjeta. Se persiste al instante. Si el estado elegido queda fuera del filtro
+  activo, la tarjeta sale de la vuelta restante (con Undo disponible).
+- **Ocultar**: excluye la tarjeta de todos los mazos y templates hasta
+  des-ocultarla desde la Biblioteca.
+- **Undo**: botón visible ~8 s para revertir la última acción (resultado,
+  cambio de estado u ocultar). Restaura historial, contadores, estado, la
+  vuelta y la tarjeta actual, aunque la tarjeta haya salido por filtros.
+- **Atajos de teclado**: `Espacio`/`Enter` voltear, `→`/`2` acierto,
+  `←`/`1` fallo, `H`/`↑` ocultar, `Z` undo. Se centralizan en
+  `src/config/keyboard.ts`.
+- La sesión se guarda en `session_state` después de cada acción: al reabrir se
+  retoma con la misma config, orden, tarjeta, lado (volteada o no) y
+  contadores.
+- Al terminar la vuelta se muestra el resumen (vistas, aciertos, fallos y %)
+  con `Nueva vuelta`, `Repasar solo las falladas` (si hubo fallos) y el acceso
+  a filtros/templates (fase 5).
+
 ## PWA
 
 - El `manifest.webmanifest` y el service worker se agregan en la fase 7.
@@ -118,7 +145,10 @@ Pantalla `/import`: se sube un CSV/TSV o se pega el texto.
 ```
 src/app/            rutas y UI (App Router)
 src/app/api/        route handlers REST
+src/components/     componentes de UI (tarjeta de estudio, resumen)
+src/config/         configuración centralizada (atajos de teclado)
 src/db/             schema Drizzle, cliente SQLite, migraciones y bootstrap
+src/server/         servicios de servidor (importación, sesión de estudio)
 drizzle/            migraciones SQL versionadas
 lib/                lógica de dominio pura (sin React ni DB) + tests
   import/           parser CSV/TSV, encabezados, preview y merge
@@ -141,7 +171,8 @@ Reglas del proyecto:
 - [x] **Fase 2** — Importador CSV/TSV (parser, encabezados, preview, reimport).
 - [x] **Fase 3** — Dominio de estudio en `/lib` (mazo, vuelta ponderada,
       historial, undo, resumen).
-- [ ] **Fase 4** — UI de estudio mobile-first.
+- [x] **Fase 4** — UI de estudio mobile-first (tarjeta, volteo, gestos,
+      botones, atajos, métricas, resumen, undo, sesión persistida).
 - [ ] **Fase 5** — Filtros, templates y persistencia de sesión.
 - [ ] **Fase 6** — Biblioteca (alta/edición/borrado, ocultas, exportar).
 - [ ] **Fase 7** — Pulido: temas, i18n, PWA, accesibilidad.
