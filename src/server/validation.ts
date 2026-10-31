@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CARD_STATUSES, SIDE_FIELDS } from "@lib/types";
+import { CARD_STATUSES, LANGUAGES, SIDE_FIELDS, THEMES } from "@lib/types";
 
 const columnIndex = z.number().int().min(0).nullable();
 
@@ -60,3 +60,9 @@ export const cardUpdateSchema = cardCreateSchema.extend({
 });
 
 export const exportFormatSchema = z.enum(["csv", "json"]);
+
+/** Partial preferences update. Unknown keys are stripped by Zod. */
+export const settingsUpdateSchema = z.object({
+  theme: z.enum(THEMES).optional(),
+  language: z.enum(LANGUAGES).optional(),
+});

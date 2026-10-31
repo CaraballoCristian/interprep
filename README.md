@@ -42,6 +42,7 @@ por defecto `Eng → Esp`) automáticamente.
 | `npm run typecheck` | chequeo de tipos |
 | `npm run db:generate` | genera una migración a partir del schema Drizzle |
 | `npm run db:migrate` | aplica migraciones manualmente |
+| `npm run icons` | regenera los íconos PWA en `public/icons/` |
 
 ## Docker
 
@@ -181,14 +182,40 @@ API:
   borrado.
 - `GET /api/export?format=csv|json`: backup completo.
 
+## Temas, idioma y accesibilidad
+
+- **Tema oscuro por defecto** y tema claro, con toggle accesible en el header de
+  todas las pantallas. Los colores son variables CSS (`src/app/globals.css`) y
+  el tema elegido se aplica en el servidor (`<html data-theme>`), así que no hay
+  flash al cargar.
+- **Idioma ES/EN** para toda la interfaz, con selector en el header. El
+  diccionario tipado vive en `lib/i18n/dictionary.ts`: español es la fuente y
+  inglés debe cubrir las mismas claves (lo verifica un test). El idioma se
+  renderiza en el servidor (`<html lang>`).
+- Tema e idioma se guardan en `settings` vía `PUT /api/settings`; cambiarlos no
+  pierde la vuelta en curso.
+- **Accesibilidad**: foco visible en todos los controles, contraste AA, estados
+  con ícono además de color (`✓` / `✕` / `🙈`), targets táctiles de al menos
+  48px, `prefers-reduced-motion` respetado y safe-area en iOS. Lighthouse da
+  100 en accesibilidad, best practices y SEO en las pantallas principales.
+
 ## PWA
 
-- El `manifest.webmanifest` y el service worker se agregan en la fase 7.
-- `localhost` es contexto seguro: la PWA se puede instalar desde Chrome/Edge en
-  desktop y desde Android con `localhost` (vía `adb reverse`).
-- **Desde el celular por IP de la red local (http) no se puede instalar** hasta
-  tener HTTPS. Mientras tanto se puede usar desde el navegador. El deploy con
-  HTTPS está planificado como prioridad de la v2.
+- `public/manifest.webmanifest`: nombre, `display: standalone`, `start_url`,
+  colores de tema y cuatro íconos (192 y 512, `any` + `maskable`).
+- `public/sw.js` cachea el app shell (páginas, manifest e íconos). Las
+  navegaciones usan network-first y los assets estáticos cache-first; `/api/`
+  nunca se sirve desde caché, así que los datos siempre están frescos. No hay
+  modo offline completo en v1.
+- El service worker se registra **solo en producción** (no interfiere con el
+  hot reload en desarrollo).
+- Los íconos se generan sin dependencias con `npm run icons`
+  (`scripts/generate-icons.mjs`).
+- **Instalación**: `localhost` es contexto seguro, así que la PWA se puede
+  instalar desde Chrome/Edge en desktop y desde Android con `localhost` (vía
+  `adb reverse`). **Desde el celular por IP de la red local (http) no se puede
+  instalar** hasta tener HTTPS. Mientras tanto se puede usar desde el navegador.
+  El deploy con HTTPS está planificado como prioridad de la v2.
 
 ## Variables de entorno
 
@@ -203,17 +230,21 @@ API:
 ```
 src/app/            rutas y UI (App Router)
 src/app/api/        route handlers REST
-src/components/     componentes de UI (tarjeta de estudio, resumen)
+src/components/     componentes de UI (tarjeta de estudio, resumen, header,
+                    controles de tema/idioma, registro del service worker)
 src/config/         configuración centralizada (atajos de teclado)
 src/db/             schema Drizzle, cliente SQLite, migraciones y bootstrap
-src/server/         servicios de servidor (importación, estudio, templates, biblioteca)
+src/server/         servicios de servidor (importación, estudio, templates,
+                    biblioteca, settings)
 drizzle/            migraciones SQL versionadas
 lib/                lógica de dominio pura (sin React ni DB) + tests
+  i18n/             diccionario tipado ES/EN e interpolación
   import/           parser CSV/TSV, encabezados, preview y merge
   library/          validación de tarjetas, filtros y export CSV/JSON
   study/            mazo, vuelta ponderada, historial, undo y resumen
   templates/        validación de configs y nombres de templates
-scripts/            utilidades (migrate manual)
+scripts/            utilidades (migrate manual, generador de íconos PWA)
+public/             manifest, service worker e íconos PWA
 ```
 
 Reglas del proyecto:
@@ -236,4 +267,5 @@ Reglas del proyecto:
 - [x] **Fase 5** — Filtros y templates (lados A/B, categorías dinámicas,
       estados, CRUD de templates, aplicar e iniciar vuelta, persistencia).
 - [x] **Fase 6** — Biblioteca (alta/edición/borrado, ocultas, export CSV/JSON).
-- [ ] **Fase 7** — Pulido: temas, i18n, PWA, accesibilidad.
+- [x] **Fase 7** — Pulido: temas oscuro/claro, i18n ES/EN, PWA instalable
+      (manifest + service worker), accesibilidad AA y revisión final.

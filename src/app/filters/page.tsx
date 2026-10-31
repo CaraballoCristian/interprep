@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import type { TranslationKey } from "@lib/i18n/dictionary";
 import type { StudyConfig } from "@lib/study/types";
 import {
   CARD_STATUSES,
@@ -10,17 +11,19 @@ import {
   type CardStatus,
   type SideField,
 } from "@lib/types";
+import { PageHeader } from "@/components/page-header";
+import { useI18n } from "@/components/settings-provider";
 
-const FIELD_LABELS: Record<SideField, string> = {
-  termEng: "Término inglés",
-  termEsp: "Término español",
-  description: "Descripción",
+const FIELD_KEYS: Record<SideField, TranslationKey> = {
+  termEng: "field.termEng",
+  termEsp: "field.termEsp",
+  description: "field.description",
 };
 
-const STATUS_LABELS: Record<CardStatus, string> = {
-  new: "Nueva",
-  learning: "Aprendiendo",
-  learned: "Aprendida",
+const STATUS_KEYS: Record<CardStatus, TranslationKey> = {
+  new: "status.new",
+  learning: "status.learning",
+  learned: "status.learned",
 };
 
 type TemplateView = {
@@ -40,64 +43,42 @@ type FiltersView = {
   deckCount: number;
 };
 
-function readError(data: unknown): string {
-  const code =
-    typeof data === "object" && data !== null && "error" in data
-      ? (data as { error?: string }).error
-      : undefined;
+type Translate = (
+  key: TranslationKey,
+  params?: Record<string, string | number>,
+) => string;
 
-  switch (code) {
-    case "invalid_config":
-      return "Cada lado necesita al menos un campo y no pueden compartir campos.";
-    case "invalid_name":
-      return "El nombre debe tener entre 1 y 80 caracteres.";
-    case "duplicate_name":
-      return "Ya existe un template con ese nombre.";
-    case "empty_update":
-      return "No hay cambios para guardar.";
-    case "not_found":
-      return "El template ya no existe.";
-    case "invalid_input":
-      return "La configuración enviada no es válida.";
-    default:
-      return "No se pudo completar la acción.";
-  }
+function readJson(response: Response): Promise<unknown> {
+  return response.json().catch(() => null);
 }
 
-async function readJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return null;
-  }
+function categoryLabel(category: string, t: Translate): string {
+  return category === "" ? t("filters.uncategorized") : category;
 }
 
-function categoryLabel(category: string): string {
-  return category === "" ? "Sin categoría" : category;
+function sideLabel(side: SideField[], t: Translate): string {
+  return side.map((field) => t(FIELD_KEYS[field])).join(" + ") || "—";
 }
 
-function sideLabel(side: SideField[]): string {
-  return side.map((field) => FIELD_LABELS[field]).join(" + ") || "—";
-}
-
-function categoriesLabel(config: StudyConfig): string {
+function categoriesLabel(config: StudyConfig, t: Translate): string {
   if (config.categories === null) {
-    return "Todas";
+    return t("filters.categoriesAllLabel");
   }
   if (config.categories.length === 0) {
-    return "Ninguna";
+    return t("filters.categoriesNoneLabel");
   }
-  return config.categories.map(categoryLabel).join(", ");
+  return config.categories.map((category) => categoryLabel(category, t)).join(", ");
 }
 
-function statusesLabel(statuses: CardStatus[]): string {
+function statusesLabel(statuses: CardStatus[], t: Translate): string {
   if (statuses.length === 0) {
-    return "Ninguno";
+    return t("filters.statusesNoneLabel");
   }
-  return statuses.map((status) => STATUS_LABELS[status]).join(", ");
+  return statuses.map((status) => t(STATUS_KEYS[status])).join(", ");
 }
 
 export default function FiltersPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [data, setData] = useState<FiltersView | null>(null);
   const [config, setConfig] = useState<StudyConfig | null>(null);
@@ -108,6 +89,33 @@ export default function FiltersPage() {
   const [templateName, setTemplateName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+
+  const readError = useCallback(
+    (body: unknown): string => {
+      const code =
+        typeof body === "object" && body !== null && "error" in body
+          ? (body as { error?: string }).error
+          : undefined;
+
+      switch (code) {
+        case "invalid_config":
+          return t("filters.error.invalidConfig");
+        case "invalid_name":
+          return t("filters.error.invalidName");
+        case "duplicate_name":
+          return t("filters.error.duplicateName");
+        case "empty_update":
+          return t("filters.error.emptyUpdate");
+        case "not_found":
+          return t("filters.error.notFound");
+        case "invalid_input":
+          return t("filters.error.invalidInput");
+        default:
+          return t("filters.error.generic");
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -128,9 +136,7 @@ export default function FiltersPage() {
       } catch (cause) {
         if (!cancelled) {
           setError(
-            cause instanceof Error
-              ? cause.message
-              : "No se pudieron cargar los filtros.",
+            cause instanceof Error ? cause.message : t("filters.loadError"),
           );
         }
       } finally {
@@ -143,6 +149,8 @@ export default function FiltersPage() {
     return () => {
       cancelled = true;
     };
+    // Load once: changing the language must not discard unsaved filter edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshMeta = useCallback(async () => {
@@ -152,7 +160,7 @@ export default function FiltersPage() {
       throw new Error(readError(body));
     }
     setData(body as FiltersView);
-  }, []);
+  }, [readError]);
 
   async function run(action: () => Promise<void>) {
     if (busy) {
@@ -167,9 +175,7 @@ export default function FiltersPage() {
       await action();
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "No se pudo completar la acción.",
+        cause instanceof Error ? cause.message : t("filters.error.generic"),
       );
     } finally {
       setBusy(false);
@@ -291,7 +297,7 @@ export default function FiltersPage() {
       }
 
       setTemplateName("");
-      setNotice("Template guardado. Se puede aplicar cuando quieras.");
+      setNotice(t("filters.notice.saved"));
       await refreshMeta();
     });
   }
@@ -342,7 +348,7 @@ export default function FiltersPage() {
       }
 
       cancelRename();
-      setNotice("Template renombrado.");
+      setNotice(t("filters.notice.renamed"));
       await refreshMeta();
     });
   }
@@ -352,11 +358,7 @@ export default function FiltersPage() {
       return;
     }
 
-    if (
-      !window.confirm(
-        `¿Sobrescribir "${template.name}" con la configuración actual?`,
-      )
-    ) {
+    if (!window.confirm(t("filters.confirm.overwrite", { name: template.name }))) {
       return;
     }
 
@@ -372,13 +374,13 @@ export default function FiltersPage() {
         throw new Error(readError(body));
       }
 
-      setNotice("Template sobrescrito.");
+      setNotice(t("filters.notice.overwritten"));
       await refreshMeta();
     });
   }
 
   function deleteTemplate(template: TemplateView) {
-    if (!window.confirm(`¿Borrar el template "${template.name}"?`)) {
+    if (!window.confirm(t("filters.confirm.delete", { name: template.name }))) {
       return;
     }
 
@@ -395,7 +397,7 @@ export default function FiltersPage() {
       if (editingId === template.id) {
         cancelRename();
       }
-      setNotice("Template borrado.");
+      setNotice(t("filters.notice.deleted"));
       await refreshMeta();
     });
   }
@@ -403,7 +405,7 @@ export default function FiltersPage() {
   if (loading && !data) {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-2xl items-center justify-center px-4">
-        <p className="text-sm text-muted">Cargando filtros…</p>
+        <p className="text-sm text-muted">{t("filters.loading")}</p>
       </main>
     );
   }
@@ -412,13 +414,13 @@ export default function FiltersPage() {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col items-center justify-center gap-4 px-4 text-center">
         <p role="alert" className="text-sm text-danger">
-          {error ?? "No se pudieron cargar los filtros."}
+          {error ?? t("filters.loadError")}
         </p>
         <Link
           href="/"
           className="flex min-h-12 items-center rounded-xl border border-border px-5 text-sm font-medium"
         >
-          Volver al inicio
+          {t("common.backHome")}
         </Link>
       </main>
     );
@@ -430,8 +432,7 @@ export default function FiltersPage() {
       ? new Set(categoriesAll)
       : new Set(config.categories);
 
-  const sidesValid =
-    config.sideA.length > 0 && config.sideB.length > 0;
+  const sidesValid = config.sideA.length > 0 && config.sideB.length > 0;
   const overlap = config.sideA.some((field) => config.sideB.includes(field));
   const canApply = sidesValid && !overlap && !busy;
   const canSave = canApply && templateName.trim() !== "";
@@ -439,38 +440,24 @@ export default function FiltersPage() {
   const categorySummary =
     config.categories === null
       ? categoriesAll.length > 0
-        ? `Todas (${categoriesAll.length})`
-        : "Todas"
+        ? t("filters.categorySummaryAll", { count: categoriesAll.length })
+        : t("filters.categorySummaryAllPlain")
       : config.categories.length === 0
-        ? "Ninguna"
-        : `${config.categories.length} de ${categoriesAll.length}`;
+        ? t("filters.categorySummaryNone")
+        : t("filters.categorySummaryCount", {
+            selected: config.categories.length,
+            total: categoriesAll.length,
+          });
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pb-16 pt-6 sm:px-6">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted">
-            Interprep
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Filtros y templates
-          </h1>
-        </div>
-        <div className="flex gap-2">
-          <Link
-            href="/study"
-            className="flex min-h-12 items-center rounded-xl border border-border px-3 text-sm font-medium"
-          >
-            Estudiar
-          </Link>
-          <Link
-            href="/"
-            className="flex min-h-12 items-center rounded-xl border border-border px-3 text-sm font-medium"
-          >
-            Inicio
-          </Link>
-        </div>
-      </header>
+      <PageHeader
+        title={t("filters.title")}
+        links={[
+          { href: "/study", label: t("common.study") },
+          { href: "/", label: t("common.home") },
+        ]}
+      />
 
       {error && (
         <p
@@ -493,30 +480,30 @@ export default function FiltersPage() {
       <div className="space-y-4">
         <section className="space-y-4 rounded-2xl border border-border bg-surface p-4">
           <div>
-            <h2 className="text-lg font-semibold">Lados de la tarjeta</h2>
+            <h2 className="text-lg font-semibold">{t("filters.sidesTitle")}</h2>
             <p className="mt-1 text-sm text-muted">
-              Un campo no puede estar en A y B a la vez. Cada lado necesita al
-              menos un campo.
+              {t("filters.sidesDescription")}
             </p>
           </div>
 
           <div className="space-y-2">
             <div className="grid grid-cols-[1fr_3.5rem_3.5rem] items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
-              <span>Campo</span>
-              <span className="text-center">A</span>
-              <span className="text-center">B</span>
+              <span>{t("filters.field")}</span>
+              <span className="text-center">{t("filters.sideA")}</span>
+              <span className="text-center">{t("filters.sideB")}</span>
             </div>
 
             {SIDE_FIELDS.map((field) => {
               const inA = config.sideA.includes(field);
               const inB = config.sideB.includes(field);
+              const fieldLabel = t(FIELD_KEYS[field]);
 
               return (
                 <div
                   key={field}
                   className="grid grid-cols-[1fr_3.5rem_3.5rem] items-center gap-2"
                 >
-                  <span className="text-sm">{FIELD_LABELS[field]}</span>
+                  <span className="text-sm">{fieldLabel}</span>
 
                   <label
                     className={`flex min-h-12 items-center justify-center rounded-xl border ${
@@ -530,11 +517,13 @@ export default function FiltersPage() {
                       className="h-5 w-5"
                       checked={inA}
                       disabled={busy || inB}
-                      aria-label={`Lado A: ${FIELD_LABELS[field]}`}
+                      aria-label={t("filters.sideLabelA", {
+                        field: fieldLabel,
+                      })}
                       onChange={() => toggleSide("sideA", field)}
                     />
                     <span className="sr-only">
-                      Lado A: {FIELD_LABELS[field]}
+                      {t("filters.sideLabelA", { field: fieldLabel })}
                     </span>
                   </label>
 
@@ -550,11 +539,13 @@ export default function FiltersPage() {
                       className="h-5 w-5"
                       checked={inB}
                       disabled={busy || inA}
-                      aria-label={`Lado B: ${FIELD_LABELS[field]}`}
+                      aria-label={t("filters.sideLabelB", {
+                        field: fieldLabel,
+                      })}
                       onChange={() => toggleSide("sideB", field)}
                     />
                     <span className="sr-only">
-                      Lado B: {FIELD_LABELS[field]}
+                      {t("filters.sideLabelB", { field: fieldLabel })}
                     </span>
                   </label>
                 </div>
@@ -564,14 +555,16 @@ export default function FiltersPage() {
 
           {!sidesValid && (
             <p className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-sm">
-              Cada lado necesita al menos un campo para poder aplicar.
+              {t("filters.sidesInvalid")}
             </p>
           )}
         </section>
 
         <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-lg font-semibold">Categorías</h2>
+            <h2 className="text-lg font-semibold">
+              {t("filters.categoriesTitle")}
+            </h2>
             <span className="text-xs text-muted">{categorySummary}</span>
           </div>
 
@@ -581,7 +574,7 @@ export default function FiltersPage() {
                 <span aria-hidden="true" className="text-muted">
                   ▾
                 </span>
-                Elegir categorías
+                {t("filters.chooseCategories")}
               </span>
               <span className="text-xs font-normal text-muted">
                 {categorySummary}
@@ -596,7 +589,7 @@ export default function FiltersPage() {
                   disabled={busy}
                   className="min-h-12 rounded-xl border border-border text-sm font-medium disabled:opacity-50"
                 >
-                  Todas
+                  {t("filters.all")}
                 </button>
                 <button
                   type="button"
@@ -604,13 +597,13 @@ export default function FiltersPage() {
                   disabled={busy}
                   className="min-h-12 rounded-xl border border-border text-sm font-medium disabled:opacity-50"
                 >
-                  Ninguna
+                  {t("filters.none")}
                 </button>
               </div>
 
               {categoriesAll.length === 0 ? (
                 <p className="px-2 py-3 text-sm text-muted">
-                  Todavía no hay categorías. Importá tarjetas para verlas acá.
+                  {t("filters.noCategories")}
                 </p>
               ) : (
                 <div className="space-y-1">
@@ -629,7 +622,9 @@ export default function FiltersPage() {
                           disabled={busy}
                           onChange={() => toggleCategory(category)}
                         />
-                        <span className="text-sm">{categoryLabel(category)}</span>
+                        <span className="text-sm">
+                          {categoryLabel(category, t)}
+                        </span>
                       </label>
                     );
                   })}
@@ -640,7 +635,9 @@ export default function FiltersPage() {
         </section>
 
         <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
-          <h2 className="text-lg font-semibold">Estados</h2>
+          <h2 className="text-lg font-semibold">
+            {t("filters.statusesTitle")}
+          </h2>
 
           <div className="space-y-1">
             {CARD_STATUSES.map((status) => {
@@ -658,16 +655,14 @@ export default function FiltersPage() {
                     disabled={busy}
                     onChange={() => toggleStatus(status)}
                   />
-                  <span className="text-sm">{STATUS_LABELS[status]}</span>
+                  <span className="text-sm">{t(STATUS_KEYS[status])}</span>
                 </label>
               );
             })}
           </div>
 
           {config.statuses.length === 0 && (
-            <p className="text-sm text-muted">
-              Sin estados seleccionados el mazo queda vacío.
-            </p>
+            <p className="text-sm text-muted">{t("filters.statusesEmpty")}</p>
           )}
         </section>
 
@@ -677,31 +672,30 @@ export default function FiltersPage() {
           disabled={!canApply}
           className="min-h-14 w-full rounded-2xl bg-accent px-5 text-base font-semibold text-accent-foreground disabled:opacity-50"
         >
-          Aplicar y empezar vuelta
+          {t("filters.apply")}
         </button>
         <p className="text-center text-xs text-muted">
-          Al aplicar se inicia una vuelta nueva con esta configuración.
+          {t("filters.applyNote")}
         </p>
 
         <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
           <div>
-            <h2 className="text-lg font-semibold">Guardar como template</h2>
+            <h2 className="text-lg font-semibold">{t("filters.saveTitle")}</h2>
             <p className="mt-1 text-sm text-muted">
-              Guarda lados, categorías y estados con un nombre. No cambia la
-              vuelta en curso.
+              {t("filters.saveDescription")}
             </p>
           </div>
 
           <form onSubmit={saveAsTemplate} className="space-y-2">
             <label htmlFor="template-name" className="sr-only">
-              Nombre del template
+              {t("filters.saveNameLabel")}
             </label>
             <input
               id="template-name"
               value={templateName}
               onChange={(event) => setTemplateName(event.target.value)}
               maxLength={80}
-              placeholder='Ej. "spa first_1"'
+              placeholder={t("filters.savePlaceholder")}
               className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-accent"
             />
             <button
@@ -709,14 +703,16 @@ export default function FiltersPage() {
               disabled={!canSave}
               className="min-h-12 w-full rounded-xl border border-border px-5 text-sm font-semibold disabled:opacity-50"
             >
-              Guardar template
+              {t("filters.saveButton")}
             </button>
           </form>
         </section>
 
         <section className="space-y-3">
           <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-lg font-semibold">Templates</h2>
+            <h2 className="text-lg font-semibold">
+              {t("filters.templatesTitle")}
+            </h2>
             <span className="text-xs text-muted">
               {data.templates.length}
             </span>
@@ -724,7 +720,7 @@ export default function FiltersPage() {
 
           {data.templates.length === 0 ? (
             <p className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted">
-              No hay templates guardados.
+              {t("filters.noTemplates")}
             </p>
           ) : (
             <ul className="space-y-3">
@@ -737,23 +733,23 @@ export default function FiltersPage() {
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{template.name}</p>
                       <p className="mt-0.5 text-xs text-muted">
-                        A: {sideLabel(template.config.sideA)} → B:{" "}
-                        {sideLabel(template.config.sideB)}
+                        A: {sideLabel(template.config.sideA, t)} → B:{" "}
+                        {sideLabel(template.config.sideB, t)}
                       </p>
                     </div>
 
                     {data.templateId === template.id && (
                       <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
-                        Aplicado
+                        {t("filters.applied")}
                       </span>
                     )}
                   </div>
 
                   <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-                    <dt className="text-muted">Categorías</dt>
-                    <dd>{categoriesLabel(template.config)}</dd>
-                    <dt className="text-muted">Estados</dt>
-                    <dd>{statusesLabel(template.config.statuses)}</dd>
+                    <dt className="text-muted">{t("filters.categories")}</dt>
+                    <dd>{categoriesLabel(template.config, t)}</dd>
+                    <dt className="text-muted">{t("filters.statuses")}</dt>
+                    <dd>{statusesLabel(template.config.statuses, t)}</dd>
                   </dl>
 
                   <div className="flex flex-wrap gap-2">
@@ -763,7 +759,7 @@ export default function FiltersPage() {
                       disabled={busy}
                       className="min-h-12 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground disabled:opacity-50"
                     >
-                      Aplicar
+                      {t("filters.applyTemplate")}
                     </button>
                     <button
                       type="button"
@@ -771,7 +767,7 @@ export default function FiltersPage() {
                       disabled={busy}
                       className="min-h-12 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
                     >
-                      Renombrar
+                      {t("filters.rename")}
                     </button>
                     <button
                       type="button"
@@ -779,7 +775,7 @@ export default function FiltersPage() {
                       disabled={busy}
                       className="min-h-12 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
                     >
-                      Sobrescribir
+                      {t("filters.overwrite")}
                     </button>
                     <button
                       type="button"
@@ -787,7 +783,7 @@ export default function FiltersPage() {
                       disabled={busy}
                       className="min-h-12 rounded-xl border border-danger/40 px-4 text-sm font-medium text-danger disabled:opacity-50"
                     >
-                      Borrar
+                      {t("filters.delete")}
                     </button>
                   </div>
 
@@ -800,7 +796,7 @@ export default function FiltersPage() {
                         htmlFor={`rename-${template.id}`}
                         className="block text-sm font-medium"
                       >
-                        Nuevo nombre
+                        {t("filters.newName")}
                       </label>
                       <input
                         id={`rename-${template.id}`}
@@ -816,7 +812,7 @@ export default function FiltersPage() {
                           disabled={busy || editingName.trim() === ""}
                           className="min-h-12 flex-1 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground disabled:opacity-50"
                         >
-                          Guardar
+                          {t("common.save")}
                         </button>
                         <button
                           type="button"
@@ -824,7 +820,7 @@ export default function FiltersPage() {
                           disabled={busy}
                           className="min-h-12 flex-1 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
                         >
-                          Cancelar
+                          {t("common.cancel")}
                         </button>
                       </div>
                     </form>

@@ -3,72 +3,79 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { StudyAction, StudyView } from "@lib/study/session";
+import { SettingsControls } from "@/components/settings-controls";
+import { useI18n } from "@/components/settings-provider";
 import { matchesShortcut } from "@/config/keyboard";
 import { StudyCardView } from "@/components/study/study-card";
 import { SummaryScreen } from "@/components/study/summary-screen";
 
-function readError(data: unknown): string {
-  const code =
-    typeof data === "object" && data !== null && "error" in data
-      ? (data as { error?: string }).error
-      : undefined;
-
-  switch (code) {
-    case "not_flipped":
-      return "Volteá la tarjeta antes de evaluar.";
-    case "undo_unavailable":
-      return "El undo ya no está disponible.";
-    case "no_current_card":
-      return "No hay una tarjeta actual.";
-    case "no_failed_cards":
-      return "No hay tarjetas falladas para repasar.";
-    default:
-      return "No se pudo completar la acción.";
-  }
-}
-
 export default function StudyPage() {
+  const { t } = useI18n();
   const [view, setView] = useState<StudyView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const busyRef = useRef(false);
 
-  const act = useCallback(async (action: StudyAction) => {
-    if (busyRef.current) {
-      return;
-    }
+  const readError = useCallback(
+    (data: unknown): string => {
+      const code =
+        typeof data === "object" && data !== null && "error" in data
+          ? (data as { error?: string }).error
+          : undefined;
 
-    busyRef.current = true;
-    setBusy(true);
-    setError(null);
+      switch (code) {
+        case "not_flipped":
+          return t("study.error.notFlipped");
+        case "undo_unavailable":
+          return t("study.error.undoUnavailable");
+        case "no_current_card":
+          return t("study.error.noCurrentCard");
+        case "no_failed_cards":
+          return t("study.error.noFailedCards");
+        default:
+          return t("study.error.generic");
+      }
+    },
+    [t],
+  );
 
-    try {
-      const response = await fetch("/api/study", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(action),
-      });
-
-      const data: unknown = await response.json();
-
-      if (!response.ok) {
-        throw new Error(readError(data));
+  const act = useCallback(
+    async (action: StudyAction) => {
+      if (busyRef.current) {
+        return;
       }
 
-      setView(data as StudyView);
-      setNow(Date.now());
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "No se pudo completar la acción.",
-      );
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
-  }, []);
+      busyRef.current = true;
+      setBusy(true);
+      setError(null);
+
+      try {
+        const response = await fetch("/api/study", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(action),
+        });
+
+        const data: unknown = await response.json();
+
+        if (!response.ok) {
+          throw new Error(readError(data));
+        }
+
+        setView(data as StudyView);
+        setNow(Date.now());
+      } catch (cause) {
+        setError(
+          cause instanceof Error ? cause.message : t("study.error.generic"),
+        );
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
+      }
+    },
+    [readError, t],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +84,7 @@ export default function StudyPage() {
       try {
         const response = await fetch("/api/study", { cache: "no-store" });
         if (!response.ok) {
-          throw new Error("No se pudo cargar la sesión.");
+          throw new Error(t("study.error.load"));
         }
         const data = (await response.json()) as StudyView;
         if (!cancelled) {
@@ -87,9 +94,7 @@ export default function StudyPage() {
       } catch (cause) {
         if (!cancelled) {
           setError(
-            cause instanceof Error
-              ? cause.message
-              : "No se pudo cargar la sesión.",
+            cause instanceof Error ? cause.message : t("study.error.load"),
           );
         }
       }
@@ -98,7 +103,7 @@ export default function StudyPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   const undoVisible =
     view?.undoAvailable === true &&
@@ -186,7 +191,7 @@ export default function StudyPage() {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-lg items-center justify-center px-4">
         <p className="text-sm text-muted">
-          {error ?? "Cargando sesión…"}
+          {error ?? t("study.loading")}
         </p>
       </main>
     );
@@ -210,11 +215,14 @@ export default function StudyPage() {
             href="/"
             className="text-sm font-semibold uppercase tracking-[0.2em] text-muted"
           >
-            Interprep
+            {t("common.appName")}
           </Link>
-          <span className="text-sm font-medium tabular-nums">
-            {view.progress.index} / {view.progress.total}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium tabular-nums">
+              {view.progress.index} / {view.progress.total}
+            </span>
+            <SettingsControls />
+          </div>
         </div>
 
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
@@ -228,7 +236,9 @@ export default function StudyPage() {
           <span className="text-success">✓ {view.metrics.successes}</span>
           <span className="text-danger">✕ {view.metrics.failures}</span>
           <span className="text-muted">
-            {Math.round(view.metrics.accuracy * 100)}% de acierto
+            {t("study.accuracy", {
+              value: Math.round(view.metrics.accuracy * 100),
+            })}
           </span>
         </div>
       </header>
@@ -256,36 +266,34 @@ export default function StudyPage() {
       ) : view.emptyDeck ? (
         <section className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
           <div className="space-y-1">
-            <p className="text-lg font-semibold">
-              No hay tarjetas para estos filtros
-            </p>
+            <p className="text-lg font-semibold">{t("study.emptyTitle")}</p>
             <p className="text-sm text-muted">
-              Importá tarjetas o cambiá los filtros para armar el mazo.
+              {t("study.emptyDescription")}
             </p>
           </div>
           <Link
             href="/import"
             className="flex min-h-12 items-center justify-center rounded-xl bg-accent px-5 text-sm font-semibold text-accent-foreground"
           >
-            Importar tarjetas
+            {t("nav.import")}
           </Link>
           <Link
             href="/library"
             className="flex min-h-12 items-center justify-center rounded-xl border border-border px-5 text-sm font-medium"
           >
-            Ir a la biblioteca
+            {t("study.goLibrary")}
           </Link>
           <Link
             href="/filters"
             className="flex min-h-12 items-center justify-center rounded-xl border border-border px-5 text-sm font-medium"
           >
-            Cambiar filtros
+            {t("study.changeFilters")}
           </Link>
           <Link
             href="/"
             className="flex min-h-12 items-center justify-center rounded-xl border border-border px-5 text-sm font-medium"
           >
-            Volver al inicio
+            {t("common.backHome")}
           </Link>
         </section>
       ) : view.card ? (
@@ -310,21 +318,21 @@ export default function StudyPage() {
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2">
               <ActionButton
-                label="Fallo"
+                label={t("study.fail")}
                 icon="✕"
                 tone="danger"
                 disabled={!view.flipped || busy}
                 onClick={() => void act({ type: "result", result: "f" })}
               />
               <ActionButton
-                label="Ocultar"
+                label={t("study.hide")}
                 icon="🙈"
                 tone="neutral"
                 disabled={busy}
                 onClick={() => void act({ type: "hide" })}
               />
               <ActionButton
-                label="Acierto"
+                label={t("study.success")}
                 icon="✓"
                 tone="success"
                 disabled={!view.flipped || busy}
@@ -332,20 +340,20 @@ export default function StudyPage() {
               />
             </div>
 
-            <div className="flex min-h-11 items-center justify-between gap-3">
+            <div className="flex min-h-12 items-center justify-between gap-3">
               <p className="text-xs text-muted">
                 {view.flipped
-                  ? "Deslizá la tarjeta o usá los botones"
-                  : "Tocá la tarjeta para ver la respuesta"}
+                  ? t("study.hintFlipped")
+                  : t("study.hintUnflipped")}
               </p>
               {undoVisible && (
                 <button
                   type="button"
                   onClick={() => void act({ type: "undo" })}
                   disabled={busy}
-                  className="min-h-11 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
+                  className="min-h-12 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
                 >
-                  ↺ Undo {undoSeconds}s
+                  {t("study.undo", { seconds: undoSeconds })}
                 </button>
               )}
             </div>
@@ -354,8 +362,10 @@ export default function StudyPage() {
       ) : (
         <section className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
           <div className="space-y-1">
-            <p className="text-lg font-semibold">No hay una tarjeta disponible</p>
-            <p className="text-sm text-muted">Probá iniciar una vuelta nueva.</p>
+            <p className="text-lg font-semibold">{t("study.noCardTitle")}</p>
+            <p className="text-sm text-muted">
+              {t("study.noCardDescription")}
+            </p>
           </div>
           <button
             type="button"
@@ -363,13 +373,13 @@ export default function StudyPage() {
             disabled={busy}
             className="min-h-12 rounded-xl bg-accent px-5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
           >
-            Nueva vuelta
+            {t("study.newRound")}
           </button>
           <Link
             href="/"
             className="flex min-h-12 items-center justify-center rounded-xl border border-border px-5 text-sm font-medium"
           >
-            Volver al inicio
+            {t("common.backHome")}
           </Link>
         </section>
       )}

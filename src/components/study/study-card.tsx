@@ -7,19 +7,21 @@ import type {
   StudyCard as StudyCardModel,
   StudyConfig,
 } from "@lib/study/types";
+import type { TranslationKey } from "@lib/i18n/dictionary";
 import {
   CARD_STATUSES,
   type CardResult,
   type CardStatus,
   type SideField,
 } from "@lib/types";
+import { useI18n } from "@/components/settings-provider";
 
 const SWIPE_THRESHOLD = 80;
 
-const STATUS_LABELS: Record<CardStatus, string> = {
-  new: "Nueva",
-  learning: "Aprendiendo",
-  learned: "Aprendida",
+const STATUS_KEYS: Record<CardStatus, TranslationKey> = {
+  new: "status.new",
+  learning: "status.learning",
+  learned: "status.learned",
 };
 
 function fieldValue(card: StudyCardModel, field: SideField): string {
@@ -69,8 +71,10 @@ function SideContent({
 }
 
 function HistoryIcons({ history }: { history: CardResult[] }) {
+  const { t } = useI18n();
+
   if (history.length === 0) {
-    return <span className="text-xs text-muted">Sin historial</span>;
+    return <span className="text-xs text-muted">{t("study.noHistory")}</span>;
   }
 
   const successes = history.filter((result) => result === "s").length;
@@ -79,7 +83,11 @@ function HistoryIcons({ history }: { history: CardResult[] }) {
   return (
     <span
       className="flex items-center gap-1 text-sm"
-      aria-label={`Historial: ${successes} aciertos y ${failures} fallos de ${history.length}`}
+      aria-label={t("study.historyLabel", {
+        successes,
+        failures,
+        total: history.length,
+      })}
     >
       {history.map((result, index) => (
         <span
@@ -115,6 +123,7 @@ export function StudyCardView({
   onHide,
   onStatusChange,
 }: StudyCardProps) {
+  const { t } = useI18n();
   const reducedMotion = useReducedMotion();
   const movedRef = useRef(false);
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
@@ -168,7 +177,7 @@ export function StudyCardView({
     if (!horizontal && drag.y < 0) {
       overlay = {
         icon: "🙈",
-        label: "Ocultar",
+        label: t("study.hide"),
         className: "border-border bg-surface-2 text-foreground",
       };
     } else if (horizontal && flipped) {
@@ -176,18 +185,18 @@ export function StudyCardView({
         drag.x > 0
           ? {
               icon: "✓",
-              label: "Acierto",
+              label: t("study.success"),
               className: "border-success/50 bg-success/15 text-success",
             }
           : {
               icon: "✕",
-              label: "Fallo",
+              label: t("study.fail"),
               className: "border-danger/50 bg-danger/15 text-danger",
             };
     } else if (horizontal) {
       overlay = {
         icon: "↔",
-        label: "Volteá para evaluar",
+        label: t("study.swipe.flipFirst"),
         className: "border-border bg-surface-2 text-muted",
       };
     }
@@ -204,7 +213,7 @@ export function StudyCardView({
         {...bind()}
         role="button"
         tabIndex={0}
-        aria-label={flipped ? "Ver la pregunta" : "Ver la respuesta"}
+        aria-label={flipped ? t("study.showQuestion") : t("study.showAnswer")}
         onClick={handleClick}
         className="relative flex h-full touch-pan-y select-none flex-col rounded-3xl border border-border bg-surface p-5 shadow-xl"
         style={{
@@ -233,7 +242,7 @@ export function StudyCardView({
         <div className="flex items-center justify-between gap-3">
           <HistoryIcons history={card.history} />
           <span className="text-xs uppercase tracking-[0.15em] text-muted">
-            {flipped ? "Respuesta" : "Pregunta"}
+            {flipped ? t("study.answer") : t("study.question")}
           </span>
         </div>
 
@@ -270,7 +279,7 @@ export function StudyCardView({
           <div
             className="grid grid-cols-3 gap-1"
             role="group"
-            aria-label="Estado de la tarjeta"
+            aria-label={t("study.statusGroup")}
           >
             {CARD_STATUSES.map((status) => (
               <button
@@ -279,13 +288,13 @@ export function StudyCardView({
                 onClick={() => onStatusChange(status)}
                 disabled={busy}
                 aria-pressed={card.status === status}
-                className={`min-h-11 rounded-lg border px-1 text-xs font-medium ${
+                className={`min-h-12 rounded-lg border px-1 text-xs font-medium ${
                   card.status === status
                     ? "border-accent bg-accent/15 text-accent"
                     : "border-border bg-surface-2 text-muted"
                 }`}
               >
-                {STATUS_LABELS[status]}
+                {t(STATUS_KEYS[status])}
               </button>
             ))}
           </div>

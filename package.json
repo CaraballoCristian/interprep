@@ -10,7 +10,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts"
+    "db:migrate": "tsx scripts/migrate.ts",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@use-gesture/react": "^10.3.1",

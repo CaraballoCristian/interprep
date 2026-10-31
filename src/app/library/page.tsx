@@ -9,18 +9,21 @@ import {
 } from "react";
 import type { HiddenFilter, LibraryFilter } from "@lib/library/filter";
 import type { LibraryCard } from "@lib/library/types";
+import type { TranslationKey } from "@lib/i18n/dictionary";
 import { CARD_STATUSES, type CardResult, type CardStatus } from "@lib/types";
+import { PageHeader } from "@/components/page-header";
+import { useI18n } from "@/components/settings-provider";
 
-const STATUS_LABELS: Record<CardStatus, string> = {
-  new: "Nueva",
-  learning: "Aprendiendo",
-  learned: "Aprendida",
+const STATUS_KEYS: Record<CardStatus, TranslationKey> = {
+  new: "status.new",
+  learning: "status.learning",
+  learned: "status.learned",
 };
 
-const HIDDEN_OPTIONS: { value: HiddenFilter; label: string }[] = [
-  { value: "all", label: "Todas" },
-  { value: "visible", label: "Visibles" },
-  { value: "hidden", label: "Ocultas" },
+const HIDDEN_OPTIONS: { value: HiddenFilter; key: TranslationKey }[] = [
+  { value: "all", key: "library.visibleAll" },
+  { value: "visible", key: "library.visibleOnly" },
+  { value: "hidden", key: "library.hiddenOnly" },
 ];
 
 const ALL_CATEGORIES = "__all__";
@@ -51,33 +54,10 @@ const EMPTY_DRAFT: CardDraft = {
   status: "new",
 };
 
-function readError(data: unknown): string {
-  const code =
-    typeof data === "object" && data !== null && "error" in data
-      ? (data as { error?: string }).error
-      : undefined;
-
-  switch (code) {
-    case "terms_required":
-      return "Completá el término en inglés y el término en español.";
-    case "duplicate_card":
-      return "Ya existe una tarjeta con ese par de términos.";
-    case "invalid_status":
-      return "El estado elegido no es válido.";
-    case "invalid_hidden":
-      return "La visibilidad enviada no es válida.";
-    case "empty_update":
-      return "No hay cambios para guardar.";
-    case "not_found":
-      return "La tarjeta ya no existe.";
-    case "invalid_input":
-      return "Los datos enviados no son válidos.";
-    case "invalid_json":
-      return "La solicitud no es válida.";
-    default:
-      return "No se pudo completar la acción.";
-  }
-}
+type Translate = (
+  key: TranslationKey,
+  params?: Record<string, string | number>,
+) => string;
 
 async function readJson(response: Response): Promise<unknown> {
   try {
@@ -87,13 +67,13 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
-function categoryLabel(category: string): string {
-  return category === "" ? "Sin categoría" : category;
+function categoryLabel(category: string, t: Translate): string {
+  return category === "" ? t("library.uncategorized") : category;
 }
 
-function historyText(history: CardResult[]): string {
+function historyText(history: CardResult[], t: Translate): string {
   if (history.length === 0) {
-    return "Sin historial";
+    return t("library.noHistory");
   }
 
   const shown = history.slice(-12);
@@ -119,6 +99,7 @@ function CardFields({
   disabled,
   onChange,
 }: CardFieldsProps) {
+  const { t } = useI18n();
   const inputClass =
     "min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent disabled:opacity-60";
 
@@ -129,7 +110,7 @@ function CardFields({
           htmlFor={`${idPrefix}-term-eng`}
           className="mb-1 block text-sm font-medium"
         >
-          Término inglés
+          {t("field.termEng")}
         </label>
         <input
           id={`${idPrefix}-term-eng`}
@@ -147,7 +128,7 @@ function CardFields({
           htmlFor={`${idPrefix}-term-esp`}
           className="mb-1 block text-sm font-medium"
         >
-          Término español
+          {t("field.termEsp")}
         </label>
         <input
           id={`${idPrefix}-term-esp`}
@@ -166,7 +147,7 @@ function CardFields({
             htmlFor={`${idPrefix}-category`}
             className="mb-1 block text-sm font-medium"
           >
-            Categoría
+            {t("field.category")}
           </label>
           <input
             id={`${idPrefix}-category`}
@@ -192,7 +173,7 @@ function CardFields({
             htmlFor={`${idPrefix}-status`}
             className="mb-1 block text-sm font-medium"
           >
-            Estado
+            {t("field.status")}
           </label>
           <select
             id={`${idPrefix}-status`}
@@ -205,7 +186,7 @@ function CardFields({
           >
             {CARD_STATUSES.map((status) => (
               <option key={status} value={status}>
-                {STATUS_LABELS[status]}
+                {t(STATUS_KEYS[status])}
               </option>
             ))}
           </select>
@@ -217,7 +198,7 @@ function CardFields({
           htmlFor={`${idPrefix}-description`}
           className="mb-1 block text-sm font-medium"
         >
-          Descripción
+          {t("field.description")}
         </label>
         <textarea
           id={`${idPrefix}-description`}
@@ -234,6 +215,7 @@ function CardFields({
 }
 
 export default function LibraryPage() {
+  const { t } = useI18n();
   const [data, setData] = useState<LibraryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -250,6 +232,34 @@ export default function LibraryPage() {
   const [createDraft, setCreateDraft] = useState<CardDraft>(EMPTY_DRAFT);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<CardDraft>(EMPTY_DRAFT);
+
+  function readError(body: unknown): string {
+    const code =
+      typeof body === "object" && body !== null && "error" in body
+        ? (body as { error?: string }).error
+        : undefined;
+
+    switch (code) {
+      case "terms_required":
+        return t("library.error.termsRequired");
+      case "duplicate_card":
+        return t("library.error.duplicate");
+      case "invalid_status":
+        return t("library.error.invalidStatus");
+      case "invalid_hidden":
+        return t("library.error.invalidHidden");
+      case "empty_update":
+        return t("library.error.emptyUpdate");
+      case "not_found":
+        return t("library.error.notFound");
+      case "invalid_input":
+        return t("library.error.invalidInput");
+      case "invalid_json":
+        return t("library.error.invalidJson");
+      default:
+        return t("library.error.generic");
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -286,9 +296,7 @@ export default function LibraryPage() {
             return;
           }
           setError(
-            cause instanceof Error
-              ? cause.message
-              : "No se pudo cargar la biblioteca.",
+            cause instanceof Error ? cause.message : t("library.loadError"),
           );
         })
         .finally(() => {
@@ -302,6 +310,7 @@ export default function LibraryPage() {
       controller.abort();
       clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, category, status, hidden, refreshKey]);
 
   const refresh = () => setRefreshKey((key) => key + 1);
@@ -319,9 +328,7 @@ export default function LibraryPage() {
       await action();
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "No se pudo completar la acción.",
+        cause instanceof Error ? cause.message : t("library.error.generic"),
       );
     } finally {
       setBusy(false);
@@ -364,7 +371,7 @@ export default function LibraryPage() {
       }
 
       cancelCreate();
-      setNotice("Tarjeta creada.");
+      setNotice(t("library.notice.created"));
       refresh();
     });
   }
@@ -409,7 +416,7 @@ export default function LibraryPage() {
       }
 
       cancelEdit();
-      setNotice("Cambios guardados.");
+      setNotice(t("library.notice.saved"));
       refresh();
     });
   }
@@ -427,7 +434,11 @@ export default function LibraryPage() {
         throw new Error(readError(body));
       }
 
-      setNotice(card.hidden ? "Tarjeta restaurada." : "Tarjeta ocultada.");
+      setNotice(
+        card.hidden
+          ? t("library.notice.restored")
+          : t("library.notice.hidden"),
+      );
       refresh();
     });
   }
@@ -435,7 +446,10 @@ export default function LibraryPage() {
   function removeCard(card: LibraryCard) {
     if (
       !window.confirm(
-        `¿Borrar definitivamente "${card.termEng} → ${card.termEsp}"?`,
+        t("library.confirm.delete", {
+          termEng: card.termEng,
+          termEsp: card.termEsp,
+        }),
       )
     ) {
       return;
@@ -454,7 +468,7 @@ export default function LibraryPage() {
       if (editingId === card.id) {
         cancelEdit();
       }
-      setNotice("Tarjeta borrada.");
+      setNotice(t("library.notice.deleted"));
       refresh();
     });
   }
@@ -477,7 +491,7 @@ export default function LibraryPage() {
   if (loading && !data) {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-2xl items-center justify-center px-4">
-        <p className="text-sm text-muted">Cargando biblioteca…</p>
+        <p className="text-sm text-muted">{t("library.loading")}</p>
       </main>
     );
   }
@@ -486,47 +500,38 @@ export default function LibraryPage() {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col items-center justify-center gap-4 px-4 text-center">
         <p role="alert" className="text-sm text-danger">
-          {error ?? "No se pudo cargar la biblioteca."}
+          {error ?? t("library.loadError")}
         </p>
         <Link
           href="/"
           className="flex min-h-12 items-center rounded-xl border border-border px-5 text-sm font-medium"
         >
-          Volver al inicio
+          {t("common.backHome")}
         </Link>
       </main>
     );
   }
 
+  const summary = t("library.summary", {
+    filtered: data.filtered,
+    total: data.total,
+    cards: t(data.total === 1 ? "library.cardOne" : "library.cardMany"),
+    hidden: data.hidden,
+    hiddenWord: t(
+      data.hidden === 1 ? "library.hiddenOne" : "library.hiddenMany",
+    ),
+  });
+
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pb-16 pt-6 sm:px-6">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted">
-            Interprep
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">Biblioteca</h1>
-          <p className="mt-1 text-sm text-muted">
-            {data.filtered} de {data.total}{" "}
-            {data.total === 1 ? "tarjeta" : "tarjetas"} · {data.hidden}{" "}
-            {data.hidden === 1 ? "oculta" : "ocultas"}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link
-            href="/study"
-            className="flex min-h-12 items-center rounded-xl border border-border px-3 text-sm font-medium"
-          >
-            Estudiar
-          </Link>
-          <Link
-            href="/"
-            className="flex min-h-12 items-center rounded-xl border border-border px-3 text-sm font-medium"
-          >
-            Inicio
-          </Link>
-        </div>
-      </header>
+      <PageHeader
+        title={t("library.title")}
+        subtitle={summary}
+        links={[
+          { href: "/study", label: t("common.study") },
+          { href: "/", label: t("common.home") },
+        ]}
+      />
 
       {error && (
         <p
@@ -549,7 +554,9 @@ export default function LibraryPage() {
       <div className="space-y-4">
         <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Buscar y filtrar</h2>
+            <h2 className="text-lg font-semibold">
+              {t("library.searchTitle")}
+            </h2>
             {hasFilters && (
               <button
                 type="button"
@@ -557,7 +564,7 @@ export default function LibraryPage() {
                 disabled={busy}
                 className="min-h-12 rounded-xl border border-border px-3 text-sm font-medium disabled:opacity-50"
               >
-                Limpiar filtros
+                {t("library.clearFilters")}
               </button>
             )}
           </div>
@@ -567,14 +574,14 @@ export default function LibraryPage() {
               htmlFor="library-search"
               className="mb-1 block text-sm font-medium"
             >
-              Buscar
+              {t("library.searchLabel")}
             </label>
             <input
               id="library-search"
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Término, categoría o descripción"
+              placeholder={t("library.searchPlaceholder")}
               autoComplete="off"
               className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
             />
@@ -586,7 +593,7 @@ export default function LibraryPage() {
                 htmlFor="library-category"
                 className="mb-1 block text-sm font-medium"
               >
-                Categoría
+                {t("library.categoryLabel")}
               </label>
               <select
                 id="library-category"
@@ -600,10 +607,12 @@ export default function LibraryPage() {
                 }
                 className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
               >
-                <option value={ALL_CATEGORIES}>Todas las categorías</option>
+                <option value={ALL_CATEGORIES}>
+                  {t("library.allCategories")}
+                </option>
                 {categoryOptions.map((item) => (
                   <option key={item || "__empty"} value={item}>
-                    {categoryLabel(item)}
+                    {categoryLabel(item, t)}
                   </option>
                 ))}
               </select>
@@ -614,7 +623,7 @@ export default function LibraryPage() {
                 htmlFor="library-status"
                 className="mb-1 block text-sm font-medium"
               >
-                Estado
+                {t("library.statusLabel")}
               </label>
               <select
                 id="library-status"
@@ -628,10 +637,10 @@ export default function LibraryPage() {
                 }
                 className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
               >
-                <option value="">Todos los estados</option>
+                <option value="">{t("library.allStatuses")}</option>
                 {CARD_STATUSES.map((item) => (
                   <option key={item} value={item}>
-                    {STATUS_LABELS[item]}
+                    {t(STATUS_KEYS[item])}
                   </option>
                 ))}
               </select>
@@ -639,7 +648,9 @@ export default function LibraryPage() {
           </div>
 
           <div>
-            <p className="mb-1 text-sm font-medium">Visibilidad</p>
+            <p className="mb-1 text-sm font-medium">
+              {t("library.visibility")}
+            </p>
             <div className="grid grid-cols-3 gap-2">
               {HIDDEN_OPTIONS.map((option) => {
                 const selected = hidden === option.value;
@@ -656,7 +667,7 @@ export default function LibraryPage() {
                         : "border-border bg-background"
                     }`}
                   >
-                    {option.label}
+                    {t(option.key)}
                   </button>
                 );
               })}
@@ -665,7 +676,7 @@ export default function LibraryPage() {
 
           {loading && (
             <p role="status" className="text-xs text-muted">
-              Actualizando…
+              {t("library.updating")}
             </p>
           )}
         </section>
@@ -677,31 +688,32 @@ export default function LibraryPage() {
             disabled={busy || creating}
             className="min-h-12 flex-1 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground disabled:opacity-50"
           >
-            Nueva tarjeta
+            {t("library.newCard")}
           </button>
           <a
             href="/api/export?format=csv"
             download
             className="flex min-h-12 flex-1 items-center justify-center rounded-xl border border-border px-4 text-sm font-medium"
           >
-            Exportar CSV
+            {t("library.exportCsv")}
           </a>
           <a
             href="/api/export?format=json"
             download
             className="flex min-h-12 flex-1 items-center justify-center rounded-xl border border-border px-4 text-sm font-medium"
           >
-            Exportar JSON
+            {t("library.exportJson")}
           </a>
         </div>
         <p className="text-center text-xs text-muted">
-          La exportación incluye todas las tarjetas, también las ocultas, con su
-          historial y contadores.
+          {t("library.exportNote")}
         </p>
 
         {creating && (
           <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
-            <h2 className="text-lg font-semibold">Nueva tarjeta</h2>
+            <h2 className="text-lg font-semibold">
+              {t("library.createTitle")}
+            </h2>
             <form onSubmit={submitCreate} className="space-y-4">
               <CardFields
                 idPrefix="create"
@@ -718,7 +730,7 @@ export default function LibraryPage() {
                   disabled={busy}
                   className="min-h-12 flex-1 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground disabled:opacity-50"
                 >
-                  Guardar tarjeta
+                  {t("library.saveCard")}
                 </button>
                 <button
                   type="button"
@@ -726,7 +738,7 @@ export default function LibraryPage() {
                   disabled={busy}
                   className="min-h-12 flex-1 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
                 >
-                  Cancelar
+                  {t("common.cancel")}
                 </button>
               </div>
             </form>
@@ -735,38 +747,38 @@ export default function LibraryPage() {
 
         {data.total === 0 ? (
           <section className="space-y-3 rounded-2xl border border-border bg-surface p-4 text-center">
-            <p className="font-semibold">Todavía no hay tarjetas</p>
+            <p className="font-semibold">{t("library.emptyTitle")}</p>
             <p className="text-sm text-muted">
-              Importá tu planilla o creá la primera tarjeta manualmente.
+              {t("library.emptyDescription")}
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <Link
                 href="/import"
                 className="flex min-h-12 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground"
               >
-                Importar tarjetas
+                {t("library.importCards")}
               </Link>
               <button
                 type="button"
                 onClick={startCreate}
                 className="min-h-12 rounded-xl border border-border px-4 text-sm font-medium"
               >
-                Crear tarjeta
+                {t("library.createCard")}
               </button>
             </div>
           </section>
         ) : data.cards.length === 0 ? (
           <section className="space-y-3 rounded-2xl border border-border bg-surface p-4 text-center">
-            <p className="font-semibold">No hay resultados</p>
+            <p className="font-semibold">{t("library.noResultsTitle")}</p>
             <p className="text-sm text-muted">
-              No hay tarjetas que coincidan con la búsqueda o los filtros.
+              {t("library.noResultsDescription")}
             </p>
             <button
               type="button"
               onClick={clearFilters}
               className="min-h-12 w-full rounded-xl border border-border px-4 text-sm font-medium"
             >
-              Limpiar filtros
+              {t("library.clearFilters")}
             </button>
           </section>
         ) : (
@@ -790,11 +802,11 @@ export default function LibraryPage() {
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-1">
                       <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-xs font-medium">
-                        {STATUS_LABELS[card.status]}
+                        {t(STATUS_KEYS[card.status])}
                       </span>
                       {card.hidden && (
                         <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">
-                          Oculta
+                          {t("library.hiddenBadge")}
                         </span>
                       )}
                     </div>
@@ -807,23 +819,27 @@ export default function LibraryPage() {
                   )}
 
                   <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-                    <dt className="text-muted">Categoría</dt>
-                    <dd>{categoryLabel(card.category)}</dd>
-                    <dt className="text-muted">Historial</dt>
+                    <dt className="text-muted">{t("library.category")}</dt>
+                    <dd>{categoryLabel(card.category, t)}</dd>
+                    <dt className="text-muted">{t("library.history")}</dt>
                     <dd>
                       <span
                         title={card.history
                           .map((result) => (result === "s" ? "✓" : "✕"))
                           .join(" ")}
                       >
-                        {historyText(card.history)}
+                        {historyText(card.history, t)}
                       </span>
                     </dd>
-                    <dt className="text-muted">Contadores</dt>
+                    <dt className="text-muted">{t("library.counters")}</dt>
                     <dd>
-                      <span className="text-success">✓ {card.totalSuccess}</span>
+                      <span className="text-success">
+                        ✓ {card.totalSuccess}
+                      </span>
                       <span className="mx-1 text-muted">·</span>
-                      <span className="text-danger">✕ {card.totalFail}</span>
+                      <span className="text-danger">
+                        ✕ {card.totalFail}
+                      </span>
                     </dd>
                   </dl>
 
@@ -834,7 +850,7 @@ export default function LibraryPage() {
                       disabled={busy}
                       className="min-h-12 flex-1 rounded-xl border border-border px-3 text-sm font-medium disabled:opacity-50"
                     >
-                      {editing ? "Editando" : "Editar"}
+                      {editing ? t("library.editing") : t("library.edit")}
                     </button>
                     <button
                       type="button"
@@ -842,7 +858,7 @@ export default function LibraryPage() {
                       disabled={busy}
                       className="min-h-12 flex-1 rounded-xl border border-border px-3 text-sm font-medium disabled:opacity-50"
                     >
-                      {card.hidden ? "Mostrar" : "Ocultar"}
+                      {card.hidden ? t("library.show") : t("library.hide")}
                     </button>
                     <button
                       type="button"
@@ -850,7 +866,7 @@ export default function LibraryPage() {
                       disabled={busy}
                       className="min-h-12 flex-1 rounded-xl border border-danger/40 px-3 text-sm font-medium text-danger disabled:opacity-50"
                     >
-                      Borrar
+                      {t("library.delete")}
                     </button>
                   </div>
 
@@ -877,7 +893,7 @@ export default function LibraryPage() {
                           disabled={busy}
                           className="min-h-12 flex-1 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground disabled:opacity-50"
                         >
-                          Guardar cambios
+                          {t("library.saveChanges")}
                         </button>
                         <button
                           type="button"
@@ -885,7 +901,7 @@ export default function LibraryPage() {
                           disabled={busy}
                           className="min-h-12 flex-1 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
                         >
-                          Cancelar
+                          {t("common.cancel")}
                         </button>
                       </div>
                     </form>

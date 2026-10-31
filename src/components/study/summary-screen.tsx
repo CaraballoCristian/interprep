@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { RoundSummary } from "@lib/study/round";
+import { useI18n } from "@/components/settings-provider";
 
 type SummaryScreenProps = {
   summary: RoundSummary;
@@ -24,29 +25,38 @@ export function SummaryScreen({
   onReviewFailed,
   onUndo,
 }: SummaryScreenProps) {
+  const { t } = useI18n();
+
   return (
     <section className="flex flex-1 flex-col justify-center gap-6 py-8">
       <div className="text-center">
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted">
-          Vuelta terminada
+          {t("summary.roundFinished")}
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Resumen</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+          {t("summary.title")}
+        </h1>
         <p className="mt-1 text-sm text-muted">
-          {summary.seen} de {total} tarjetas
+          {t("summary.cards", { seen: summary.seen, total })}
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Tarjetas vistas" value={summary.seen} />
+        <Stat label={t("summary.seen")} value={summary.seen} />
         <Stat
-          label="Aciertos"
+          label={t("summary.successes")}
           value={summary.successes}
           tone="success"
           icon="✓"
         />
-        <Stat label="Fallos" value={summary.failures} tone="danger" icon="✕" />
         <Stat
-          label="% de acierto"
+          label={t("summary.failures")}
+          value={summary.failures}
+          tone="danger"
+          icon="✕"
+        />
+        <Stat
+          label={t("summary.accuracy")}
           value={`${Math.round(summary.accuracy * 100)}%`}
         />
       </div>
@@ -58,7 +68,7 @@ export function SummaryScreen({
           disabled={busy}
           className="min-h-14 w-full rounded-2xl bg-accent px-5 text-base font-semibold text-accent-foreground disabled:opacity-50"
         >
-          Nueva vuelta
+          {t("summary.newRound")}
         </button>
 
         {failedCount > 0 && (
@@ -68,7 +78,7 @@ export function SummaryScreen({
             disabled={busy}
             className="min-h-12 w-full rounded-2xl border border-border bg-surface px-5 text-sm font-semibold disabled:opacity-50"
           >
-            Repasar solo las falladas ({failedCount})
+            {t("summary.reviewFailed", { count: failedCount })}
           </button>
         )}
 
@@ -76,7 +86,7 @@ export function SummaryScreen({
           href="/filters"
           className="flex min-h-12 w-full items-center justify-center rounded-2xl border border-border px-5 text-sm font-medium"
         >
-          Cambiar template / filtros
+          {t("summary.changeFilters")}
         </Link>
 
         {undoAvailable && (
@@ -86,7 +96,7 @@ export function SummaryScreen({
             disabled={busy}
             className="min-h-12 w-full rounded-2xl px-5 text-sm font-medium text-muted underline underline-offset-4 disabled:opacity-50"
           >
-            Deshacer la última acción
+            {t("summary.undo")}
           </button>
         )}
       </div>
