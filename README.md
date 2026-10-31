@@ -79,6 +79,23 @@ docker compose exec app node -e "require('better-sqlite3')('/app/data/app.db').b
 
 Además existe exportación manual CSV/JSON desde la Biblioteca (fase 6).
 
+## Importación
+
+Pantalla `/import`: se sube un CSV/TSV o se pega el texto.
+
+- Las columnas se detectan **por nombre** (no por posición), con alias ES/EN y
+  sin distinguir mayúsculas ni acentos. Si falta una columna requerida, la UI
+  permite asignarla a mano.
+- Estados: `Nueva/Nuevo/New` → `new`, `Aprendiendo/Learning` → `learning`,
+  `Aprendida/Aprendido/Learned` → `learned`, vacío → `new`.
+- La vista previa muestra filas válidas, con error y vacías, el detalle de las
+  filas problemáticas y (si ya hay datos) cuántas se actualizan, cuántas son
+  nuevas y cuántas se conservan. Las filas con error se saltean.
+- Reimportar hace merge por la clave normalizada `termEng + termEsp`: actualiza
+  categoría, descripción y el texto de los términos, y **conserva** estado,
+  oculta, historial y contadores. Las tarjetas que no están en el archivo se
+  conservan.
+
 ## PWA
 
 - El `manifest.webmanifest` y el service worker se agregan en la fase 7.
@@ -119,7 +136,7 @@ Reglas del proyecto:
 
 - [x] **Fase 1** — Base: Next.js + Tailwind, Drizzle + SQLite + migraciones,
       Docker/compose, README.
-- [ ] **Fase 2** — Importador CSV/TSV (parser, encabezados, preview, reimport).
+- [x] **Fase 2** — Importador CSV/TSV (parser, encabezados, preview, reimport).
 - [ ] **Fase 3** — Dominio de estudio en `/lib` (mazo, vuelta ponderada,
       historial, undo, resumen).
 - [ ] **Fase 4** — UI de estudio mobile-first.

@@ -9,23 +9,30 @@ export default function Home() {
           Interpreter terminology trainer
         </h1>
         <p className="text-base text-muted">
-          Modo Repetición Intensivo. La base está lista: Next.js, Tailwind,
-          SQLite y migraciones.
+          Modo Repetición Intensivo. Empezá importando tu planilla de
+          terminología.
         </p>
       </header>
 
       <section className="rounded-2xl border border-border bg-surface p-5">
-        <h2 className="text-lg font-semibold">Estado</h2>
+        <h2 className="text-lg font-semibold">Empezar</h2>
         <p className="mt-1 text-sm text-muted">
-          Fase 1 completada. El importador y el motor de estudio llegan en las
-          próximas fases.
+          Cargá tu planilla de terminología para armar el mazo.
         </p>
-        <a
-          className="mt-4 inline-flex min-h-12 items-center justify-center rounded-xl bg-accent px-5 text-sm font-semibold text-accent-foreground"
-          href="/api/health"
-        >
-          Verificar /api/health
-        </a>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <a
+            className="inline-flex min-h-12 items-center justify-center rounded-xl bg-accent px-5 text-sm font-semibold text-accent-foreground"
+            href="/import"
+          >
+            Importar tarjetas
+          </a>
+          <a
+            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-border px-5 text-sm font-medium"
+            href="/api/health"
+          >
+            /api/health
+          </a>
+        </div>
       </section>
     </main>
   );
