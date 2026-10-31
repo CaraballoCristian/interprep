@@ -40,6 +40,12 @@ export default function Home() {
           </a>
           <a
             className="inline-flex min-h-12 items-center justify-center rounded-xl border border-border px-5 text-sm font-medium"
+            href="/library"
+          >
+            Biblioteca
+          </a>
+          <a
+            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-border px-5 text-sm font-medium"
             href="/api/health"
           >
             /api/health

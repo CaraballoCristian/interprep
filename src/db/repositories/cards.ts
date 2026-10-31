@@ -1,9 +1,11 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import type {
   CardInsert,
   CardUpdate,
   ExistingCard,
 } from "@lib/import/plan";
+import type { LibraryCard } from "@lib/library/types";
+import { matchKey as buildMatchKey } from "@lib/normalize";
 import type { CardSnapshot } from "@lib/study/history";
 import type { StudyCard } from "@lib/study/types";
 import type { CardResult, CardStatus } from "@lib/types";
@@ -183,4 +185,116 @@ export function restoreCardFields(
     })
     .where(eq(cards.id, id))
     .run();
+}
+
+const libraryCardColumns = {
+  id: cards.id,
+  termEng: cards.termEng,
+  termEsp: cards.termEsp,
+  category: cards.category,
+  description: cards.description,
+  status: cards.status,
+  hidden: cards.hidden,
+  history: cards.history,
+  totalSuccess: cards.totalSuccess,
+  totalFail: cards.totalFail,
+  createdAt: cards.createdAt,
+  updatedAt: cards.updatedAt,
+};
+
+/** Every card, including hidden ones. Filtering happens in the pure domain. */
+export function listLibraryCards(): LibraryCard[] {
+  return getDb().select(libraryCardColumns).from(cards).all();
+}
+
+export function getCardById(id: string): LibraryCard | null {
+  const row = getDb()
+    .select(libraryCardColumns)
+    .from(cards)
+    .where(eq(cards.id, id))
+    .get();
+  return row ?? null;
+}
+
+/**
+ * Finds a card with the same normalized term pair. `excludeId` lets an edit
+ * keep its own key without colliding with itself.
+ */
+export function findCardByMatchKey(
+  key: string,
+  excludeId?: string,
+): { id: string } | null {
+  const where = excludeId
+    ? and(eq(cards.matchKey, key), ne(cards.id, excludeId))
+    : eq(cards.matchKey, key);
+
+  const row = getDb()
+    .select({ id: cards.id })
+    .from(cards)
+    .where(where)
+    .get();
+
+  return row ?? null;
+}
+
+export type LibraryCardInput = {
+  termEng: string;
+  termEsp: string;
+  category: string;
+  description: string;
+  status: CardStatus;
+};
+
+/** Creates a card with empty history/counters and returns the stored row. */
+export function createCard(input: LibraryCardInput): LibraryCard {
+  const now = new Date().toISOString();
+
+  return getDb()
+    .insert(cards)
+    .values({
+      id: crypto.randomUUID(),
+      category: input.category,
+      termEng: input.termEng,
+      termEsp: input.termEsp,
+      description: input.description,
+      status: input.status,
+      hidden: false,
+      history: [],
+      totalSuccess: 0,
+      totalFail: 0,
+      matchKey: buildMatchKey(input.termEng, input.termEsp),
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning(libraryCardColumns)
+    .get();
+}
+
+/** Updates editable content and recomputes the matching key. */
+export function updateCard(
+  id: string,
+  input: LibraryCardInput,
+): LibraryCard | null {
+  const row = getDb()
+    .update(cards)
+    .set({
+      category: input.category,
+      termEng: input.termEng,
+      termEsp: input.termEsp,
+      description: input.description,
+      status: input.status,
+      matchKey: buildMatchKey(input.termEng, input.termEsp),
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(cards.id, id))
+    .returning(libraryCardColumns)
+    .get();
+
+  return row ?? null;
+}
+
+/** Returns false when the card did not exist. */
+export function deleteCard(id: string): boolean {
+  const result = getDb().delete(cards).where(eq(cards.id, id)).run();
+  return result.changes > 0;
 }

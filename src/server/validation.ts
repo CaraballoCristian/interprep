@@ -42,3 +42,21 @@ export const templateUpdateSchema = z.object({
   name: z.string().optional(),
   config: studyConfigSchema.optional(),
 });
+
+/**
+ * Shape-only validation for library cards. Semantic rules (required terms,
+ * duplicate term pairs) live in the pure card validation and the service.
+ */
+export const cardCreateSchema = z.object({
+  termEng: z.string().optional(),
+  termEsp: z.string().optional(),
+  category: z.string().optional(),
+  description: z.string().optional(),
+  status: z.enum(CARD_STATUSES).optional(),
+});
+
+export const cardUpdateSchema = cardCreateSchema.extend({
+  hidden: z.boolean().optional(),
+});
+
+export const exportFormatSchema = z.enum(["csv", "json"]);

@@ -130,6 +130,7 @@ function repairSession(session: StudySession): StudySession {
   const cards = listStudyCards();
   const deck = buildDeck(cards, session.config);
   const round = repairRound(session.round, cards, session.config);
+  const cardsById = new Map(cards.map((card) => [card.id, card]));
 
   // A session saved while the deck was empty can pick up newly imported cards.
   if (round.order.length === 0 && round.seen.length === 0 && deck.length > 0) {
@@ -141,11 +142,20 @@ function repairSession(session: StudySession): StudySession {
     };
   }
 
+  // Deleting the card referenced by the pending undo invalidates the snapshot.
+  const undo =
+    session.undo && !cardsById.has(session.undo.entry.cardId)
+      ? null
+      : session.undo;
+
   const roundChanged =
     round.order.length !== session.round.order.length ||
     round.index !== session.round.index;
+  const undoChanged = undo !== session.undo;
 
-  return roundChanged ? { ...session, round } : session;
+  return roundChanged || undoChanged
+    ? { ...session, round, undo }
+    : session;
 }
 
 /** Loads the persisted session, creating or repairing it when needed. */

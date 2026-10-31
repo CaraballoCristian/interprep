@@ -77,7 +77,7 @@ SQLite está en modo WAL, por lo que también conviene copiar `app.db-wal` y
 docker compose exec app node -e "require('better-sqlite3')('/app/data/app.db').backup('/app/data/backup.db')"
 ```
 
-Además existe exportación manual CSV/JSON desde la Biblioteca (fase 6).
+Además existe exportación manual CSV/JSON desde la Biblioteca.
 
 ## Importación
 
@@ -156,6 +156,31 @@ API:
 - `GET/POST /api/templates`, `PATCH/DELETE /api/templates/:id`,
   `POST /api/templates/:id/apply`.
 
+## Biblioteca
+
+Pantalla `/library`, accesible desde el inicio y desde el estado de mazo vacío:
+
+- **Lista** con búsqueda sin distinguir mayúsculas ni acentos sobre término
+  inglés, término español, categoría y descripción, y filtros por categoría,
+  estado y visibilidad (`Todas / Visibles / Ocultas`). El filtrado se resuelve
+  en el servidor con la misma lógica pura que cubren los tests.
+- **Alta manual** con término inglés y español obligatorios, categoría libre,
+  estado y descripción. El par de términos normalizado es único.
+- **Edición** de todos los campos sin reimportar; conserva estado, historial y
+  contadores. **Borrado** con confirmación.
+- **Ocultas**: se listan con el filtro `Ocultas` y se restauran con `Mostrar`;
+  mientras estén ocultas siguen excluidas de los mazos.
+- **Exportar** todo como CSV (UTF-8 con BOM para planillas) o JSON
+  (`{ version, exportedAt, cards }`). Incluye ocultas, historial y contadores;
+  es independiente de la base y sirve como backup.
+
+API:
+
+- `GET/POST /api/cards`: listado filtrado / alta manual.
+- `PATCH/DELETE /api/cards/:id`: edición parcial (contenido y `hidden`) /
+  borrado.
+- `GET /api/export?format=csv|json`: backup completo.
+
 ## PWA
 
 - El `manifest.webmanifest` y el service worker se agregan en la fase 7.
@@ -181,10 +206,11 @@ src/app/api/        route handlers REST
 src/components/     componentes de UI (tarjeta de estudio, resumen)
 src/config/         configuración centralizada (atajos de teclado)
 src/db/             schema Drizzle, cliente SQLite, migraciones y bootstrap
-src/server/         servicios de servidor (importación, estudio, templates)
+src/server/         servicios de servidor (importación, estudio, templates, biblioteca)
 drizzle/            migraciones SQL versionadas
 lib/                lógica de dominio pura (sin React ni DB) + tests
   import/           parser CSV/TSV, encabezados, preview y merge
+  library/          validación de tarjetas, filtros y export CSV/JSON
   study/            mazo, vuelta ponderada, historial, undo y resumen
   templates/        validación de configs y nombres de templates
 scripts/            utilidades (migrate manual)
@@ -209,5 +235,5 @@ Reglas del proyecto:
       botones, atajos, métricas, resumen, undo, sesión persistida).
 - [x] **Fase 5** — Filtros y templates (lados A/B, categorías dinámicas,
       estados, CRUD de templates, aplicar e iniciar vuelta, persistencia).
-- [ ] **Fase 6** — Biblioteca (alta/edición/borrado, ocultas, exportar).
+- [x] **Fase 6** — Biblioteca (alta/edición/borrado, ocultas, export CSV/JSON).
 - [ ] **Fase 7** — Pulido: temas, i18n, PWA, accesibilidad.

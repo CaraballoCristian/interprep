@@ -270,6 +270,12 @@ export default function StudyPage() {
             Importar tarjetas
           </Link>
           <Link
+            href="/library"
+            className="flex min-h-12 items-center justify-center rounded-xl border border-border px-5 text-sm font-medium"
+          >
+            Ir a la biblioteca
+          </Link>
+          <Link
             href="/filters"
             className="flex min-h-12 items-center justify-center rounded-xl border border-border px-5 text-sm font-medium"
           >
