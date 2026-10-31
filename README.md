@@ -121,6 +121,8 @@ src/app/api/        route handlers REST
 src/db/             schema Drizzle, cliente SQLite, migraciones y bootstrap
 drizzle/            migraciones SQL versionadas
 lib/                lógica de dominio pura (sin React ni DB) + tests
+  import/           parser CSV/TSV, encabezados, preview y merge
+  study/            mazo, vuelta ponderada, historial, undo y resumen
 scripts/            utilidades (migrate manual)
 ```
 
@@ -137,7 +139,7 @@ Reglas del proyecto:
 - [x] **Fase 1** — Base: Next.js + Tailwind, Drizzle + SQLite + migraciones,
       Docker/compose, README.
 - [x] **Fase 2** — Importador CSV/TSV (parser, encabezados, preview, reimport).
-- [ ] **Fase 3** — Dominio de estudio en `/lib` (mazo, vuelta ponderada,
+- [x] **Fase 3** — Dominio de estudio en `/lib` (mazo, vuelta ponderada,
       historial, undo, resumen).
 - [ ] **Fase 4** — UI de estudio mobile-first.
 - [ ] **Fase 5** — Filtros, templates y persistencia de sesión.
