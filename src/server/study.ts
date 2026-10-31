@@ -17,6 +17,7 @@ import type {
   StudyView,
 } from "@lib/study/session";
 import type { StudyCard, StudyConfig } from "@lib/study/types";
+import { normalizeConfig } from "@lib/templates/validation";
 import {
   createUndoEntry,
   isUndoAvailable,
@@ -81,12 +82,12 @@ function configFromTemplate(template: Template | null): {
   }
 
   return {
-    config: {
+    config: normalizeConfig({
       sideA: template.sideA,
       sideB: template.sideB,
-      categories: template.categories ?? null,
+      categories: template.categories,
       statuses: template.statuses,
-    },
+    }),
     templateId: template.id,
   };
 }
@@ -354,4 +355,44 @@ export function applyStudyAction(
       return buildView(session, now);
     }
   }
+}
+
+/**
+ * Replaces the active config and starts a new round with the recomputed deck.
+ * `templateId` is set when the config comes from a template and null when it
+ * comes from manual filters.
+ */
+export function applyStudyConfig(
+  config: StudyConfig,
+  templateId: string | null = null,
+  now = Date.now(),
+): StudyView {
+  const session = ensureSession();
+  const cards = listStudyCards();
+
+  session.config = config;
+  session.templateId = templateId;
+  session.round = createRound(buildDeck(cards, config));
+  session.flipped = false;
+  session.undo = null;
+  persist(session);
+
+  return buildView(session, now);
+}
+
+/**
+ * Detaches a deleted template from the saved session without creating one or
+ * touching the current round.
+ */
+export function detachSessionTemplate(templateId: string): void {
+  const session = loadStudySession();
+  if (!session || session.templateId !== templateId) {
+    return;
+  }
+
+  saveStudySession({
+    ...session,
+    templateId: null,
+    updatedAt: new Date().toISOString(),
+  });
 }

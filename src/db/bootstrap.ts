@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
 import { getDb } from "./client";
 import { runMigrations } from "./migrate";
+import { findSettings } from "./repositories/settings";
 import { CARD_STATUSES, settings, templates } from "./schema";
 
 const DEFAULT_TEMPLATE_NAME = "Eng → Esp";
@@ -50,11 +50,16 @@ function seedFirstRun(): void {
 
 /** Returns the single settings row, creating it if it somehow went missing. */
 export function getSettings() {
-  const db = getDb();
-  const rows = db.select().from(settings).where(eq(settings.id, "default")).all();
-  if (rows.length === 0) {
-    seedFirstRun();
-    return db.select().from(settings).where(eq(settings.id, "default")).all()[0];
+  const existing = findSettings();
+  if (existing) {
+    return existing;
   }
-  return rows[0];
+
+  seedFirstRun();
+
+  const seeded = findSettings();
+  if (!seeded) {
+    throw new Error("settings row could not be created");
+  }
+  return seeded;
 }

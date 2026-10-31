@@ -73,7 +73,7 @@ export function SummaryScreen({
         )}
 
         <Link
-          href="/"
+          href="/filters"
           className="flex min-h-12 w-full items-center justify-center rounded-2xl border border-border px-5 text-sm font-medium"
         >
           Cambiar template / filtros

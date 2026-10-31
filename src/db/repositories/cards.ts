@@ -20,6 +20,19 @@ export function countCards(): number {
   return row?.count ?? 0;
 }
 
+/**
+ * Distinct categories present in the cards table, sorted for the filters UI.
+ * The empty string is kept: imported cards without a category use it.
+ */
+export function listCategories(): string[] {
+  return getDb()
+    .selectDistinct({ category: cards.category })
+    .from(cards)
+    .all()
+    .map((row) => row.category)
+    .sort((a, b) => a.localeCompare(b, "es"));
+}
+
 /** Lightweight projection used by the importer to match existing cards. */
 export function listCardsForMatching(): ExistingCard[] {
   return getDb()

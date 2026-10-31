@@ -121,7 +121,40 @@ Pantalla `/study`, mobile-first y usable a 360px:
   contadores.
 - Al terminar la vuelta se muestra el resumen (vistas, aciertos, fallos y %)
   con `Nueva vuelta`, `Repasar solo las falladas` (si hubo fallos) y el acceso
-  a filtros/templates (fase 5).
+  a filtros/templates.
+
+## Filtros y templates
+
+Pantalla `/filters`, accesible desde el inicio, el resumen de vuelta y el
+estado de mazo vacío:
+
+- **Lados A/B**: cada lado combina uno o más de `Término inglés`,
+  `Término español`, `Descripción`. Un campo marcado en A se deshabilita en B y
+  viceversa; ambos lados necesitan al menos un campo.
+- **Categorías**: se listan dinámicamente desde las tarjetas, con checkboxes y
+  acciones `Todas` / `Ninguna`. `Todas` es dinámico (las categorías nuevas
+  entran solas); `Ninguna` deja el mazo vacío.
+- **Estados**: checkboxes `Nueva / Aprendiendo / Aprendida`. Sin estados el
+  mazo queda vacío (es una configuración válida).
+- **Aplicar**: guarda la config en la sesión y arranca una vuelta nueva con el
+  mazo recalculado. Cambiar filtros a mitad de vuelta empieza de cero.
+- **Templates**: guardan lados, categorías y estados bajo un nombre único
+  (máx. 80). Acciones: guardar la config actual, aplicar, renombrar,
+  sobrescribir y borrar. Guardar, renombrar y sobrescribir **no** aplican el
+  template ni tocan la vuelta en curso; aplicar sí inicia una vuelta nueva y
+  recuerda el template como último usado.
+- Al abrir la app se retoma la sesión guardada si hay una vuelta en curso; si
+  no, se carga el último template usado. En el primer uso existe `Eng → Esp`
+  (A: inglés; B: español + descripción).
+- Borrar el template aplicado lo desvincula de la sesión sin cambiar la config
+  ni la vuelta.
+
+API:
+
+- `GET/PUT /api/session`: config actual + opciones de filtros / aplicar una
+  config manual.
+- `GET/POST /api/templates`, `PATCH/DELETE /api/templates/:id`,
+  `POST /api/templates/:id/apply`.
 
 ## PWA
 
@@ -148,11 +181,12 @@ src/app/api/        route handlers REST
 src/components/     componentes de UI (tarjeta de estudio, resumen)
 src/config/         configuración centralizada (atajos de teclado)
 src/db/             schema Drizzle, cliente SQLite, migraciones y bootstrap
-src/server/         servicios de servidor (importación, sesión de estudio)
+src/server/         servicios de servidor (importación, estudio, templates)
 drizzle/            migraciones SQL versionadas
 lib/                lógica de dominio pura (sin React ni DB) + tests
   import/           parser CSV/TSV, encabezados, preview y merge
   study/            mazo, vuelta ponderada, historial, undo y resumen
+  templates/        validación de configs y nombres de templates
 scripts/            utilidades (migrate manual)
 ```
 
@@ -173,6 +207,7 @@ Reglas del proyecto:
       historial, undo, resumen).
 - [x] **Fase 4** — UI de estudio mobile-first (tarjeta, volteo, gestos,
       botones, atajos, métricas, resumen, undo, sesión persistida).
-- [ ] **Fase 5** — Filtros, templates y persistencia de sesión.
+- [x] **Fase 5** — Filtros y templates (lados A/B, categorías dinámicas,
+      estados, CRUD de templates, aplicar e iniciar vuelta, persistencia).
 - [ ] **Fase 6** — Biblioteca (alta/edición/borrado, ocultas, exportar).
 - [ ] **Fase 7** — Pulido: temas, i18n, PWA, accesibilidad.
