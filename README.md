@@ -44,6 +44,25 @@ por defecto `Eng → Esp`) automáticamente.
 | `npm run db:migrate` | aplica migraciones manualmente |
 | `npm run icons` | regenera los íconos PWA en `public/icons/` |
 
+## Navegación
+
+La app abre directamente en **Estudiar** (`/`). No hay pantalla de inicio con
+botones: la navegación vive en tabs con URLs reales, así que back/forward,
+deep links y la PWA siguen funcionando.
+
+| tab | URL | contenido |
+|---|---|---|
+| Estudiar | `/` | tarjeta, métricas, resumen de vuelta |
+| Importar | `/import` | pegar/subir CSV o TSV y revisar la vista previa |
+| Filtros | `/filters` | lados A/B, categorías, estados y templates |
+| Biblioteca | `/library` | buscar, crear, editar, ocultar y exportar tarjetas |
+
+- **Mobile**: barra superior con tema/idioma y tabs fijos abajo (safe-area en
+  iOS, targets de al menos 48px).
+- **Desktop** (`md`): sidebar fijo a la izquierda y contenido ancho (hasta
+  `max-w-5xl`); la tarjeta de estudio mantiene un ancho de lectura cómodo.
+- `/study` redirige a `/` para no romper enlaces viejos.
+
 ## Docker
 
 ```bash
@@ -84,9 +103,16 @@ Además existe exportación manual CSV/JSON desde la Biblioteca.
 
 Pantalla `/import`: se sube un CSV/TSV o se pega el texto.
 
-- Las columnas se detectan **por nombre** (no por posición), con alias ES/EN y
-  sin distinguir mayúsculas ni acentos. Si falta una columna requerida, la UI
-  permite asignarla a mano.
+- **Fila de encabezados**: se usa la **primera fila cuyo primer campo sea un
+  marcador de numeración** (`Nº`, `n°`, `n.º`, `Nro`, `No.`, `Número`, `#`).
+  Las filas por encima se ignoran. Si no hay marcador, se busca la primera fila
+  que parezca un encabezado; como último recurso se usa la fila 1.
+- La fila detectada se muestra en la vista previa y se puede **cambiar a mano**
+  (1-based) y reanalizar. El commit reutiliza la misma fila.
+- Los **nombres de las columnas se toman de esa fila** (no hay nombres fijos):
+  el mapeo a los campos de la app se hace por alias ES/EN, sin distinguir
+  mayúsculas ni acentos. Si falta una columna requerida, la UI permite
+  asignarla a mano.
 - Estados: `Nueva/Nuevo/New` → `new`, `Aprendiendo/Learning` → `learning`,
   `Aprendida/Aprendido/Learned` → `learned`, vacío → `new`.
 - La vista previa muestra filas válidas, con error y vacías, el detalle de las
@@ -99,7 +125,7 @@ Pantalla `/import`: se sube un CSV/TSV o se pega el texto.
 
 ## Estudio
 
-Pantalla `/study`, mobile-first y usable a 360px:
+Pantalla `/` (antes `/study`), mobile-first y usable a 360px:
 
 - La tarjeta se voltea tocándola (o con `Espacio`/`Enter`). Los resultados
   (`Acierto`/`Fallo`) solo se registran con la tarjeta volteada.
@@ -115,7 +141,7 @@ Pantalla `/study`, mobile-first y usable a 360px:
   cambio de estado u ocultar). Restaura historial, contadores, estado, la
   vuelta y la tarjeta actual, aunque la tarjeta haya salido por filtros.
 - **Atajos de teclado**: `Espacio`/`Enter` voltear, `→`/`2` acierto,
-  `←`/`1` fallo, `H`/`↑` ocultar, `Z` undo. Se centralizan en
+  `←`/`1` fallo, `H`/`↓` ocultar, `Z` undo. Se centralizan en
   `src/config/keyboard.ts`.
 - La sesión se guarda en `session_state` después de cada acción: al reabrir se
   retoma con la misma config, orden, tarjeta, lado (volteada o no) y
@@ -126,12 +152,12 @@ Pantalla `/study`, mobile-first y usable a 360px:
 
 ## Filtros y templates
 
-Pantalla `/filters`, accesible desde el inicio, el resumen de vuelta y el
-estado de mazo vacío:
+Pantalla `/filters`:
 
 - **Lados A/B**: cada lado combina uno o más de `Término inglés`,
-  `Término español`, `Descripción`. Un campo marcado en A se deshabilita en B y
-  viceversa; ambos lados necesitan al menos un campo.
+  `Término español`, `Descripción`. Un click en el lado opuesto **mueve** el
+  campo (sin desmarcar primero); un click en el lado marcado lo quita. Ambos
+  lados necesitan al menos un campo.
 - **Categorías**: se listan dinámicamente desde las tarjetas, con checkboxes y
   acciones `Todas` / `Ninguna`. `Todas` es dinámico (las categorías nuevas
   entran solas); `Ninguna` deja el mazo vacío.
@@ -159,18 +185,19 @@ API:
 
 ## Biblioteca
 
-Pantalla `/library`, accesible desde el inicio y desde el estado de mazo vacío:
+Pantalla `/library`:
 
 - **Lista** con búsqueda sin distinguir mayúsculas ni acentos sobre término
   inglés, término español, categoría y descripción, y filtros por categoría,
   estado y visibilidad (`Todas / Visibles / Ocultas`). El filtrado se resuelve
-  en el servidor con la misma lógica pura que cubren los tests.
+  en el servidor con la misma lógica pura que cubren los tests. En desktop las
+  tarjetas se muestran en dos columnas.
 - **Alta manual** con término inglés y español obligatorios, categoría libre,
   estado y descripción. El par de términos normalizado es único.
 - **Edición** de todos los campos sin reimportar; conserva estado, historial y
   contadores. **Borrado** con confirmación.
 - **Ocultas**: se listan con el filtro `Ocultas` y se restauran con `Mostrar`;
-  mientras estén ocultas siguen excluidas de los mazos.
+  mientras están ocultas siguen excluidas de los mazos.
 - **Exportar** todo como CSV (UTF-8 con BOM para planillas) o JSON
   (`{ version, exportedAt, cards }`). Incluye ocultas, historial y contadores;
   es independiente de la base y sirve como backup.
@@ -184,11 +211,11 @@ API:
 
 ## Temas, idioma y accesibilidad
 
-- **Tema oscuro por defecto** y tema claro, con toggle accesible en el header de
-  todas las pantallas. Los colores son variables CSS (`src/app/globals.css`) y
-  el tema elegido se aplica en el servidor (`<html data-theme>`), así que no hay
-  flash al cargar.
-- **Idioma ES/EN** para toda la interfaz, con selector en el header. El
+- **Tema oscuro por defecto** y tema claro, con toggle accesible en la barra
+  superior (mobile) y en el sidebar (desktop). Los colores son variables CSS
+  (`src/app/globals.css`) y el tema elegido se aplica en el servidor
+  (`<html data-theme>`), así que no hay flash al cargar.
+- **Idioma ES/EN** para toda la interfaz, con selector junto al de tema. El
   diccionario tipado vive en `lib/i18n/dictionary.ts`: español es la fuente y
   inglés debe cubrir las mismas claves (lo verifica un test). El idioma se
   renderiza en el servidor (`<html lang>`).
@@ -203,10 +230,10 @@ API:
 
 - `public/manifest.webmanifest`: nombre, `display: standalone`, `start_url`,
   colores de tema y cuatro íconos (192 y 512, `any` + `maskable`).
-- `public/sw.js` cachea el app shell (páginas, manifest e íconos). Las
-  navegaciones usan network-first y los assets estáticos cache-first; `/api/`
-  nunca se sirve desde caché, así que los datos siempre están frescos. No hay
-  modo offline completo en v1.
+- `public/sw.js` cachea el app shell (`/`, `/import`, `/filters`, `/library`,
+  manifest e íconos). Las navegaciones usan network-first y los assets
+  estáticos cache-first; `/api/` nunca se sirve desde caché, así que los datos
+  siempre están frescos. No hay modo offline completo en v1.
 - El service worker se registra **solo en producción** (no interfiere con el
   hot reload en desarrollo).
 - Los íconos se generan sin dependencias con `npm run icons`
@@ -229,9 +256,10 @@ API:
 
 ```
 src/app/            rutas y UI (App Router)
+src/app/(app)/      layout persistente con tabs/sidebar y pantallas
 src/app/api/        route handlers REST
-src/components/     componentes de UI (tarjeta de estudio, resumen, header,
-                    controles de tema/idioma, registro del service worker)
+src/components/     componentes de UI (shell de navegación, tarjeta de estudio,
+                    resumen, controles de tema/idioma, registro del service worker)
 src/config/         configuración centralizada (atajos de teclado)
 src/db/             schema Drizzle, cliente SQLite, migraciones y bootstrap
 src/server/         servicios de servidor (importación, estudio, templates,
@@ -239,9 +267,9 @@ src/server/         servicios de servidor (importación, estudio, templates,
 drizzle/            migraciones SQL versionadas
 lib/                lógica de dominio pura (sin React ni DB) + tests
   i18n/             diccionario tipado ES/EN e interpolación
-  import/           parser CSV/TSV, encabezados, preview y merge
+  import/           parser CSV/TSV, fila de encabezados, preview y merge
   library/          validación de tarjetas, filtros y export CSV/JSON
-  study/            mazo, vuelta ponderada, historial, undo y resumen
+  study/            mazo, vuelta ponderada, historial, undo, resumen y config
   templates/        validación de configs y nombres de templates
 scripts/            utilidades (migrate manual, generador de íconos PWA)
 public/             manifest, service worker e íconos PWA
@@ -269,3 +297,5 @@ Reglas del proyecto:
 - [x] **Fase 6** — Biblioteca (alta/edición/borrado, ocultas, export CSV/JSON).
 - [x] **Fase 7** — Pulido: temas oscuro/claro, i18n ES/EN, PWA instalable
       (manifest + service worker), accesibilidad AA y revisión final.
+- [x] **Fase 8** — Navegación por tabs (bottom en mobile, sidebar en desktop) y
+      detección de la fila de encabezados por el marcador `Nº`.

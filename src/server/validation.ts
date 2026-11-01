@@ -14,6 +14,8 @@ export const importMappingSchema = z.object({
 export const importRequestSchema = z.object({
   content: z.string().min(1).max(5_000_000),
   mapping: importMappingSchema.optional(),
+  /** 1-based header row. Omitted means "detect it automatically". */
+  headerRow: z.number().int().min(1).max(100_000).optional(),
 });
 
 export type ImportRequest = z.infer<typeof importRequestSchema>;

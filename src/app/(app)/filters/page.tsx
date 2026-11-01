@@ -12,7 +12,7 @@ import {
   type CardStatus,
   type SideField,
 } from "@lib/types";
-import { PageHeader } from "@/components/page-header";
+import { PageHeading } from "@/components/page-heading";
 import { useI18n } from "@/components/settings-provider";
 
 const FIELD_KEYS: Record<SideField, TranslationKey> = {
@@ -265,7 +265,7 @@ export default function FiltersPage() {
         throw new Error(readError(body));
       }
 
-      router.push("/study");
+      router.push("/");
     });
   }
 
@@ -304,7 +304,7 @@ export default function FiltersPage() {
         throw new Error(readError(body));
       }
 
-      router.push("/study");
+      router.push("/");
     });
   }
 
@@ -395,7 +395,7 @@ export default function FiltersPage() {
 
   if (loading && !data) {
     return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-2xl items-center justify-center px-4">
+      <main className="mx-auto flex w-full max-w-4xl flex-1 items-center justify-center px-4">
         <p className="text-sm text-muted">{t("filters.loading")}</p>
       </main>
     );
@@ -403,7 +403,7 @@ export default function FiltersPage() {
 
   if (!data || !config) {
     return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col items-center justify-center gap-4 px-4 text-center">
+      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center gap-4 px-4 text-center">
         <p role="alert" className="text-sm text-danger">
           {error ?? t("filters.loadError")}
         </p>
@@ -411,7 +411,7 @@ export default function FiltersPage() {
           href="/"
           className="flex min-h-12 items-center rounded-xl border border-border px-5 text-sm font-medium"
         >
-          {t("common.backHome")}
+          {t("common.study")}
         </Link>
       </main>
     );
@@ -441,14 +441,8 @@ export default function FiltersPage() {
           });
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 pb-16 pt-6 sm:px-6">
-      <PageHeader
-        title={t("filters.title")}
-        links={[
-          { href: "/study", label: t("common.study") },
-          { href: "/", label: t("common.home") },
-        ]}
-      />
+    <main className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6">
+      <PageHeading title={t("filters.title")} />
 
       {error && (
         <p
@@ -468,7 +462,8 @@ export default function FiltersPage() {
         </p>
       )}
 
-      <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-4">
         <section className="space-y-4 rounded-2xl border border-border bg-surface p-4">
           <div>
             <h2 className="text-lg font-semibold">{t("filters.sidesTitle")}</h2>
@@ -668,7 +663,9 @@ export default function FiltersPage() {
         <p className="text-center text-xs text-muted">
           {t("filters.applyNote")}
         </p>
+        </div>
 
+        <div className="space-y-4">
         <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
           <div>
             <h2 className="text-lg font-semibold">{t("filters.saveTitle")}</h2>
@@ -821,6 +818,7 @@ export default function FiltersPage() {
             </ul>
           )}
         </section>
+        </div>
       </div>
     </main>
   );

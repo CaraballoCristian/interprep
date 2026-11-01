@@ -1,11 +1,10 @@
 /* Interprep app-shell service worker. Data always comes from /api/. */
 
-const CACHE_NAME = "interprep-shell-v1";
+const CACHE_NAME = "interprep-shell-v2";
 
 const SHELL = [
   "/",
   "/import",
-  "/study",
   "/filters",
   "/library",
   "/manifest.webmanifest",

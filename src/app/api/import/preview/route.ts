@@ -21,12 +21,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const analysis = analyzeImport(parsed.data.content, parsed.data.mapping);
+  const analysis = analyzeImport(
+    parsed.data.content,
+    parsed.data.mapping,
+    parsed.data.headerRow,
+  );
   const { plan, preview } = analysis;
 
   const response: ImportPreviewResponse = {
     headers: analysis.table.headers,
     delimiter: analysis.table.delimiter,
+    headerRow: analysis.table.headerLine,
     mapping: analysis.mapping,
     missingRequired: analysis.missingRequired,
     counts: preview.counts,

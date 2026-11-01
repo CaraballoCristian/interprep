@@ -53,4 +53,69 @@ describe("parseDelimited", () => {
     expect(table.headers).toEqual(["English", "Spanish"]);
     expect(table.rows).toEqual([]);
   });
+
+  it("uses the first row with Nº in column A as the header", () => {
+    const text = [
+      "Planilla de terminología",
+      "Curso 2026",
+      "",
+      "Datos personales",
+      "Nombre,Apellido",
+      "Nº,Inglés,Español,Categoría,Estado,Descripción",
+      "1,Policy,Póliza,Insurance,new,Contract document",
+      "2,Claim,Reclamo,Insurance,new,Claim form",
+    ].join("\n");
+
+    const table = parseDelimited(text);
+
+    expect(table.headerRowIndex).toBe(5);
+    expect(table.headerLine).toBe(6);
+    expect(table.headers).toEqual([
+      "Nº",
+      "Inglés",
+      "Español",
+      "Categoría",
+      "Estado",
+      "Descripción",
+    ]);
+    expect(table.rows).toEqual([
+      ["1", "Policy", "Póliza", "Insurance", "new", "Contract document"],
+      ["2", "Claim", "Reclamo", "Insurance", "new", "Claim form"],
+    ]);
+  });
+
+  it("ignores every row above the detected header", () => {
+    const table = parseDelimited(
+      "basura,ignorar\nmás basura,ignorar\nNº,English,Spanish\n1,Policy,Póliza\n",
+    );
+
+    expect(table.headerLine).toBe(3);
+    expect(table.rows).toEqual([["1", "Policy", "Póliza"]]);
+  });
+
+  it("accepts an explicit header row", () => {
+    const table = parseDelimited(
+      "basura,ignorar\nNº,English,Spanish\n1,Policy,Póliza\n",
+      { headerRow: 0 },
+    );
+
+    expect(table.headerLine).toBe(1);
+    expect(table.headers).toEqual(["basura", "ignorar"]);
+  });
+
+  it("falls back to the first row that looks like a header", () => {
+    const table = parseDelimited(
+      "basura,ignorar\nEnglish,Spanish\nPolicy,Póliza\n",
+    );
+
+    expect(table.headerLine).toBe(2);
+    expect(table.headers).toEqual(["English", "Spanish"]);
+  });
+
+  it("falls back to the first row when nothing matches", () => {
+    const table = parseDelimited("Columna A,Columna B\nuno,dos\n");
+
+    expect(table.headerLine).toBe(1);
+    expect(table.headers).toEqual(["Columna A", "Columna B"]);
+  });
 });

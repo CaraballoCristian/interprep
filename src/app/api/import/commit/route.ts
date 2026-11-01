@@ -21,7 +21,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const analysis = analyzeImport(parsed.data.content, parsed.data.mapping);
+  const analysis = analyzeImport(
+    parsed.data.content,
+    parsed.data.mapping,
+    parsed.data.headerRow,
+  );
 
   if (!analysis.validation.valid || !analysis.plan) {
     return Response.json(

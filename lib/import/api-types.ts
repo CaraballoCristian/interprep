@@ -13,6 +13,8 @@ export type ImportPlanSummary = {
 export type ImportPreviewResponse = {
   headers: string[];
   delimiter: string;
+  /** 1-based line number of the detected (or chosen) header row. */
+  headerRow: number;
   mapping: ColumnMapping;
   missingRequired: ImportField[];
   counts: ImportCounts;

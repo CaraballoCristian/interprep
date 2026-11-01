@@ -14,7 +14,7 @@ import {
 import type { ImportErrorReason } from "@lib/import/preview";
 import type { TranslationKey } from "@lib/i18n/dictionary";
 import type { CardStatus } from "@lib/types";
-import { PageHeader } from "@/components/page-header";
+import { PageHeading } from "@/components/page-heading";
 import { useI18n } from "@/components/settings-provider";
 
 const FIELD_KEYS: Record<ImportField, TranslationKey> = {
@@ -52,6 +52,7 @@ export default function ImportPage() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
+  const [headerRowInput, setHeaderRowInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportCommitResponse | null>(null);
@@ -74,7 +75,10 @@ export default function ImportPage() {
     }
   }
 
-  async function analyze(nextMapping?: ColumnMapping) {
+  async function analyze(options?: {
+    mapping?: ColumnMapping;
+    headerRow?: number;
+  }) {
     if (!content.trim()) {
       setError(t("import.error.pasteFirst"));
       return;
@@ -84,13 +88,16 @@ export default function ImportPage() {
     setError(null);
     setResult(null);
 
+    const headerRow = options?.headerRow ?? preview?.headerRow;
+
     try {
       const response = await fetch("/api/import/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
-          ...(nextMapping ? { mapping: nextMapping } : {}),
+          ...(options?.mapping ? { mapping: options.mapping } : {}),
+          ...(headerRow ? { headerRow } : {}),
         }),
       });
 
@@ -101,6 +108,7 @@ export default function ImportPage() {
       const data = (await response.json()) as ImportPreviewResponse;
       setPreview(data);
       setMapping(data.mapping);
+      setHeaderRowInput(String(data.headerRow));
     } catch (cause) {
       setPreview(null);
       setMapping(null);
@@ -124,7 +132,11 @@ export default function ImportPage() {
       const response = await fetch("/api/import/commit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, mapping }),
+        body: JSON.stringify({
+          content,
+          mapping,
+          ...(preview ? { headerRow: preview.headerRow } : {}),
+        }),
       });
 
       if (!response.ok) {
@@ -135,6 +147,7 @@ export default function ImportPage() {
       setResult(data);
       setPreview(null);
       setMapping(null);
+      setHeaderRowInput("");
       setContent("");
       setFileName(null);
     } catch (cause) {
@@ -157,6 +170,7 @@ export default function ImportPage() {
     setFileName(file.name);
     setPreview(null);
     setMapping(null);
+    setHeaderRowInput("");
     setResult(null);
     setError(null);
   }
@@ -166,6 +180,7 @@ export default function ImportPage() {
     setFileName(null);
     setPreview(null);
     setMapping(null);
+    setHeaderRowInput("");
     setResult(null);
     setError(null);
   }
@@ -180,8 +195,12 @@ export default function ImportPage() {
       [field]: value === "" ? null : Number(value),
     };
     setMapping(next);
-    void analyze(next);
+    void analyze({ mapping: next });
   }
+
+  const headerRowValue = Number(headerRowInput);
+  const canReanalyze =
+    Number.isInteger(headerRowValue) && headerRowValue >= 1 && !busy;
 
   const canCommit =
     !busy &&
@@ -193,11 +212,8 @@ export default function ImportPage() {
   const delimiterKey = preview ? DELIMITER_KEYS[preview.delimiter] : undefined;
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 pb-16 pt-6 sm:px-6">
-      <PageHeader
-        title={t("import.title")}
-        links={[{ href: "/", label: t("common.home") }]}
-      />
+    <main className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6">
+      <PageHeading title={t("import.title")} />
 
       {result ? (
         <section className="space-y-4 rounded-2xl border border-border bg-surface p-4">
@@ -244,7 +260,7 @@ export default function ImportPage() {
               href="/"
               className="flex min-h-12 items-center rounded-xl border border-border px-5 text-sm font-medium"
             >
-              {t("import.backHome")}
+              {t("common.study")}
             </Link>
           </div>
         </section>
@@ -264,6 +280,7 @@ export default function ImportPage() {
                 setContent(event.target.value);
                 setPreview(null);
                 setMapping(null);
+                setHeaderRowInput("");
                 setResult(null);
               }}
               rows={8}
@@ -322,6 +339,40 @@ export default function ImportPage() {
                         : (preview.delimiter ?? "—"),
                     })}
                   </span>
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-2 p-3">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label htmlFor="header-row" className="block text-sm">
+                      <span className="mb-1 block font-medium">
+                        {t("import.headerRow")}
+                      </span>
+                      <input
+                        id="header-row"
+                        type="number"
+                        min={1}
+                        value={headerRowInput}
+                        onChange={(event) =>
+                          setHeaderRowInput(event.target.value)
+                        }
+                        disabled={busy}
+                        className="min-h-12 w-24 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-accent"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void analyze({ headerRow: headerRowValue })
+                      }
+                      disabled={!canReanalyze}
+                      className="min-h-12 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
+                    >
+                      {t("import.reanalyze")}
+                    </button>
+                    <p className="min-w-0 flex-1 text-xs text-muted">
+                      {t("import.headerRowHint")}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">

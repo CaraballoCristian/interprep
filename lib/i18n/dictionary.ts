@@ -6,6 +6,7 @@ import type { Language } from "../types";
  */
 const es = {
   "common.appName": "Interprep",
+  "nav.main": "Navegación principal",
   "common.home": "Inicio",
   "common.study": "Estudiar",
   "common.cancel": "Cancelar",
@@ -37,8 +38,8 @@ const es = {
   "home.startTitle": "Empezar",
   "home.startDescription":
     "Cargá tu planilla de terminología para armar el mazo.",
-  "nav.import": "Importar tarjetas",
-  "nav.filters": "Filtros y templates",
+  "nav.import": "Importar",
+  "nav.filters": "Filtros",
   "nav.library": "Biblioteca",
 
   "import.title": "Importar tarjetas",
@@ -70,6 +71,10 @@ const es = {
   "import.importAnother": "Importar otro archivo",
   "import.backHome": "Volver al inicio",
   "import.columns": "Columnas",
+  "import.headerRow": "Fila de encabezados",
+  "import.headerRowHint":
+    "Se detecta la primera fila con Nº en la columna A. Podés cambiarla y reanalizar.",
+  "import.reanalyze": "Reanalizar",
   "import.separator": "Separador: {value}",
   "import.delimiter.comma": "coma",
   "import.delimiter.tab": "tabulación",
@@ -284,6 +289,7 @@ export type TranslationKey = keyof typeof es;
 
 const en: Record<TranslationKey, string> = {
   "common.appName": "Interprep",
+  "nav.main": "Main navigation",
   "common.home": "Home",
   "common.study": "Study",
   "common.cancel": "Cancel",
@@ -315,8 +321,8 @@ const en: Record<TranslationKey, string> = {
   "home.startTitle": "Get started",
   "home.startDescription":
     "Load your terminology spreadsheet to build the deck.",
-  "nav.import": "Import cards",
-  "nav.filters": "Filters & templates",
+  "nav.import": "Import",
+  "nav.filters": "Filters",
   "nav.library": "Library",
 
   "import.title": "Import cards",
@@ -348,6 +354,10 @@ const en: Record<TranslationKey, string> = {
   "import.importAnother": "Import another file",
   "import.backHome": "Back to home",
   "import.columns": "Columns",
+  "import.headerRow": "Header row",
+  "import.headerRowHint":
+    "The first row with Nº in column A is detected. You can change it and re-analyze.",
+  "import.reanalyze": "Re-analyze",
   "import.separator": "Separator: {value}",
   "import.delimiter.comma": "comma",
   "import.delimiter.tab": "tab",

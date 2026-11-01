@@ -61,8 +61,8 @@ export function buildPreview(
   };
 
   table.rows.forEach((row, index) => {
-    // Header occupies line 1.
-    const line = index + 2;
+    // The header row is `headerLine`; the first body row follows it.
+    const line = table.headerLine + index + 1;
 
     if (isBlankRow(row)) {
       empty += 1;

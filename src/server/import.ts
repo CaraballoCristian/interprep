@@ -20,14 +20,19 @@ export type ImportAnalysis = {
 };
 
 /**
- * Parses the file, resolves the column mapping (auto-detected unless one is
- * provided) and builds both the preview and the merge plan against the DB.
+ * Parses the file, resolves the header row and column mapping (auto-detected
+ * unless provided) and builds both the preview and the merge plan against the
+ * DB. `headerRowInput` is 1-based; omitted means auto-detect.
  */
 export function analyzeImport(
   content: string,
   mappingInput?: Partial<ColumnMapping>,
+  headerRowInput?: number,
 ): ImportAnalysis {
-  const table = parseDelimited(content);
+  const table = parseDelimited(content, {
+    headerRow:
+      headerRowInput === undefined ? undefined : headerRowInput - 1,
+  });
   const mapping = mappingInput
     ? sanitizeMapping(mappingInput)
     : detectMapping(table.headers);
