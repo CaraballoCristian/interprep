@@ -6,7 +6,7 @@ import { buildPreview } from "./preview";
 const TABLE = `English,Spanish,Category,Status,Description
 Policy,Póliza,Insurance,new,contract document
 Claim,,Insurance,new,missing spanish term
-Deductible,Deducible,Insurance,archivada,unknown status
+Deductible,Deducible,Insurance,archivada,ignored status column
 ,Prima,Insurance,,missing english term
 Coverage,Cobertura,Utilities,,`;
 
@@ -16,22 +16,29 @@ function previewOf(text: string) {
 }
 
 describe("buildPreview", () => {
-  it("interprets valid rows and defaults empty status to new", () => {
+  it("interprets valid rows and ignores the spreadsheet status", () => {
     const preview = previewOf(TABLE);
 
-    expect(preview.rows).toHaveLength(2);
+    expect(preview.rows).toHaveLength(3);
     expect(preview.rows[0]).toMatchObject({
       line: 2,
       termEng: "Policy",
       termEsp: "Póliza",
       category: "Insurance",
       description: "contract document",
-      status: "new",
     });
+    expect(preview.rows[0]).not.toHaveProperty("status");
     expect(preview.rows[1]).toMatchObject({
+      line: 4,
+      termEng: "Deductible",
+      termEsp: "Deducible",
+      description: "ignored status column",
+    });
+    expect(preview.rows[2]).toMatchObject({
+      line: 6,
       termEng: "Coverage",
       termEsp: "Cobertura",
-      status: "new",
+      category: "Utilities",
       description: "",
     });
   });
@@ -45,21 +52,12 @@ describe("buildPreview", () => {
         reason: "missingTermEsp",
         termEng: "Claim",
         termEsp: "",
-        status: "new",
-      },
-      {
-        line: 4,
-        reason: "unknownStatus",
-        termEng: "Deductible",
-        termEsp: "Deducible",
-        status: "archivada",
       },
       {
         line: 5,
         reason: "missingTermEng",
         termEng: "",
         termEsp: "Prima",
-        status: "",
       },
     ]);
   });
@@ -68,8 +66,8 @@ describe("buildPreview", () => {
     const preview = previewOf(TABLE);
     expect(preview.counts).toEqual({
       total: 5,
-      valid: 2,
-      error: 3,
+      valid: 3,
+      error: 2,
       empty: 0,
     });
   });
@@ -87,14 +85,11 @@ describe("buildPreview", () => {
     expect(preview.rows[0]).toMatchObject({
       category: "",
       description: "",
-      status: "new",
     });
   });
 
   it("trims cell values", () => {
-    const preview = previewOf(
-      "English,Spanish\n  Policy  ,  Póliza  \n",
-    );
+    const preview = previewOf("English,Spanish\n  Policy  ,  Póliza  \n");
     expect(preview.rows[0].termEng).toBe("Policy");
     expect(preview.rows[0].termEsp).toBe("Póliza");
   });

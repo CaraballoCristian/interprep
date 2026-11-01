@@ -43,6 +43,7 @@ export type TemplateInput = {
   sideB: SideField[];
   categories: string[] | null;
   statuses: CardStatus[];
+  continuous: boolean;
 };
 
 export type TemplatePatch = Partial<TemplateInput>;

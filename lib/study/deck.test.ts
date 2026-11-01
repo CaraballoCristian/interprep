@@ -32,7 +32,7 @@ function seededRandom(seed: number): () => number {
 describe("buildDeck", () => {
   const cards = [
     card({ id: "a", status: "new", category: "Insurance" }),
-    card({ id: "b", status: "learning", category: "Court" }),
+    card({ id: "b", status: "hard", category: "Court" }),
     card({ id: "c", status: "learned", category: "Insurance" }),
     card({ id: "d", status: "new", category: "Court", hidden: true }),
   ];
@@ -40,7 +40,7 @@ describe("buildDeck", () => {
   it("excludes hidden cards", () => {
     const deck = buildDeck(cards, {
       categories: null,
-      statuses: ["new", "learning", "learned"],
+      statuses: ["new", "hard", "learned"],
     });
     expect(deck.map((entry) => entry.id)).toEqual(["a", "b", "c"]);
   });
@@ -56,7 +56,7 @@ describe("buildDeck", () => {
   it("filters by category", () => {
     const deck = buildDeck(cards, {
       categories: ["Court"],
-      statuses: ["new", "learning", "learned"],
+      statuses: ["new", "hard", "learned"],
     });
     expect(deck.map((entry) => entry.id)).toEqual(["b"]);
   });
@@ -64,7 +64,7 @@ describe("buildDeck", () => {
   it("treats null categories as all categories", () => {
     const deck = buildDeck(cards, {
       categories: null,
-      statuses: ["learning"],
+      statuses: ["hard"],
     });
     expect(deck.map((entry) => entry.id)).toEqual(["b"]);
   });

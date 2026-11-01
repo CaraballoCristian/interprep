@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CARD_RESULTS, CARD_STATUSES } from "@lib/types";
+import { CARD_STATUSES } from "@lib/types";
 import {
   applyStudyAction,
   getStudyView,
@@ -10,12 +10,18 @@ export const dynamic = "force-dynamic";
 
 const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("flip"), flipped: z.boolean() }),
-  z.object({ type: z.literal("result"), result: z.enum(CARD_RESULTS) }),
   z.object({ type: z.literal("status"), status: z.enum(CARD_STATUSES) }),
   z.object({ type: z.literal("hide") }),
   z.object({ type: z.literal("undo") }),
   z.object({ type: z.literal("new-round") }),
-  z.object({ type: z.literal("review-failed") }),
+  z.object({
+    type: z.literal("review"),
+    statuses: z.array(z.enum(CARD_STATUSES)).min(1),
+  }),
+  z.object({ type: z.literal("resume") }),
+  z.object({ type: z.literal("reset") }),
+  z.object({ type: z.literal("finish") }),
+  z.object({ type: z.literal("leave") }),
 ]);
 
 function errorResponse(cause: unknown): Response {

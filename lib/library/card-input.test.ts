@@ -21,7 +21,7 @@ describe("validateCardInput", () => {
         termEsp: " Póliza ",
         category: " Insurance ",
         description: " Contract document ",
-        status: "learning",
+        status: "hard",
       }),
     ).toEqual({
       ok: true,
@@ -30,7 +30,7 @@ describe("validateCardInput", () => {
         termEsp: "Póliza",
         category: "Insurance",
         description: "Contract document",
-        status: "learning",
+        status: "hard",
       },
     });
   });

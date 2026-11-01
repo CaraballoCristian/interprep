@@ -4,7 +4,6 @@ export const IMPORT_FIELDS = [
   "termEng",
   "termEsp",
   "category",
-  "status",
   "description",
 ] as const;
 
@@ -20,14 +19,18 @@ export function emptyMapping(): ColumnMapping {
     termEng: null,
     termEsp: null,
     category: null,
-    status: null,
     description: null,
   };
 }
 
 const ALIASES: Record<ImportField, readonly string[]> = {
-  category: ["categoría", "categoria", "category"],
-  status: ["estado", "status"],
+  category: [
+    "categoría",
+    "categoria",
+    "category",
+    "industria",
+    "industry",
+  ],
   termEng: [
     "inglés",
     "ingles",

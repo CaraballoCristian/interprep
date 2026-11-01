@@ -43,6 +43,8 @@ export type FiltersView = {
   templates: TemplateView[];
   cardCount: number;
   deckCount: number;
+  /** True when the current session already has answers. */
+  sessionActive: boolean;
 };
 
 export type TemplateErrorCode =
@@ -68,6 +70,7 @@ function configFromTemplate(template: Template): StudyConfig {
     sideB: template.sideB,
     categories: template.categories,
     statuses: template.statuses,
+    continuous: template.continuous,
   });
 }
 
@@ -113,6 +116,7 @@ export function getFiltersView(): FiltersView {
     templates: listTemplateViews(),
     cardCount: countCards(),
     deckCount: buildDeck(cards, view.config).length,
+    sessionActive: view.progress.answered > 0,
   };
 }
 
@@ -194,6 +198,7 @@ export function applyTemplateToSession(id: string): StudyView {
     sideB: template.sideB,
     categories: template.categories,
     statuses: template.statuses,
+    continuous: template.continuous,
   });
 
   const view = applyStudyConfig(config, template.id);

@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { StudyAction, StudyView } from "@lib/study/session";
+import type { CardStatus } from "@lib/types";
 import { useI18n } from "@/components/settings-provider";
 import { matchesShortcut } from "@/config/keyboard";
 import { StudyCardView } from "@/components/study/study-card";
@@ -10,11 +12,12 @@ import { SummaryScreen } from "@/components/study/summary-screen";
 
 export default function StudyPage() {
   const { t } = useI18n();
+  const router = useRouter();
   const [view, setView] = useState<StudyView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
   const busyRef = useRef(false);
+  const loadedRef = useRef(false);
 
   const readError = useCallback(
     (data: unknown): string => {
@@ -30,8 +33,8 @@ export default function StudyPage() {
           return t("study.error.undoUnavailable");
         case "no_current_card":
           return t("study.error.noCurrentCard");
-        case "no_failed_cards":
-          return t("study.error.noFailedCards");
+        case "no_review_cards":
+          return t("study.error.noReviewCards");
         default:
           return t("study.error.generic");
       }
@@ -40,9 +43,9 @@ export default function StudyPage() {
   );
 
   const act = useCallback(
-    async (action: StudyAction) => {
+    async (action: StudyAction): Promise<StudyView | null> => {
       if (busyRef.current) {
-        return;
+        return null;
       }
 
       busyRef.current = true;
@@ -62,12 +65,14 @@ export default function StudyPage() {
           throw new Error(readError(data));
         }
 
-        setView(data as StudyView);
-        setNow(Date.now());
+        const next = data as StudyView;
+        setView(next);
+        return next;
       } catch (cause) {
         setError(
           cause instanceof Error ? cause.message : t("study.error.generic"),
         );
+        return null;
       } finally {
         busyRef.current = false;
         setBusy(false);
@@ -88,7 +93,7 @@ export default function StudyPage() {
         const data = (await response.json()) as StudyView;
         if (!cancelled) {
           setView(data);
-          setNow(Date.now());
+          loadedRef.current = true;
         }
       } catch (cause) {
         if (!cancelled) {
@@ -104,18 +109,31 @@ export default function StudyPage() {
     };
   }, [t]);
 
-  const undoVisible =
-    view?.undoAvailable === true &&
-    view.undoExpiresAt !== null &&
-    now < view.undoExpiresAt;
-
+  // Leaving the screen preserves the round and asks to resume on return.
   useEffect(() => {
-    if (!undoVisible) {
-      return;
-    }
-    const interval = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(interval);
-  }, [undoVisible]);
+    return () => {
+      if (!loadedRef.current) {
+        return;
+      }
+      void fetch("/api/study", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "leave" } satisfies StudyAction),
+        keepalive: true,
+      }).catch(() => undefined);
+    };
+  }, []);
+
+  const requestStatus = useCallback(
+    (status: CardStatus) => {
+      if (!view?.flipped) {
+        setError(t("study.error.notFlipped"));
+        return;
+      }
+      void act({ type: "status", status });
+    },
+    [act, t, view?.flipped],
+  );
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -142,9 +160,11 @@ export default function StudyPage() {
         return;
       }
 
-      // Undo stays available on the summary screen; the other shortcuts
-      // need a current card.
-      if (matchesShortcut(event, "undo") && undoVisible) {
+      if (view.resumePending) {
+        return;
+      }
+
+      if (matchesShortcut(event, "undo") && view.undoAvailable) {
         event.preventDefault();
         void act({ type: "undo" });
         return;
@@ -160,19 +180,19 @@ export default function StudyPage() {
         return;
       }
 
-      if (matchesShortcut(event, "success")) {
-        if (view.flipped) {
-          event.preventDefault();
-          void act({ type: "result", result: "s" });
-        }
-        return;
-      }
+      const status = matchesShortcut(event, "easy")
+        ? "easy"
+        : matchesShortcut(event, "hard")
+          ? "hard"
+          : matchesShortcut(event, "learned")
+            ? "learned"
+            : matchesShortcut(event, "new")
+              ? "new"
+              : null;
 
-      if (matchesShortcut(event, "fail")) {
-        if (view.flipped) {
-          event.preventDefault();
-          void act({ type: "result", result: "f" });
-        }
+      if (status) {
+        event.preventDefault();
+        requestStatus(status);
         return;
       }
 
@@ -184,14 +204,12 @@ export default function StudyPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [act, view, undoVisible]);
+  }, [act, requestStatus, view]);
 
   if (!view) {
     return (
       <main className="mx-auto flex w-full max-w-lg flex-1 items-center justify-center px-4 md:max-w-2xl">
-        <p className="text-sm text-muted">
-          {error ?? t("study.loading")}
-        </p>
+        <p className="text-sm text-muted">{error ?? t("study.loading")}</p>
       </main>
     );
   }
@@ -201,18 +219,13 @@ export default function StudyPage() {
       ? 0
       : Math.round((view.progress.seen / view.progress.total) * 100);
 
-  const undoSeconds =
-    view.undoExpiresAt === null
-      ? 0
-      : Math.max(0, Math.ceil((view.undoExpiresAt - now) / 1000));
-
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-4 pt-4 md:max-w-2xl">
       <header className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-base font-semibold">{t("common.study")}</h1>
           <span className="text-sm font-medium tabular-nums">
-            {view.progress.index} / {view.progress.total}
+            {view.progress.seen} / {view.progress.total}
           </span>
         </div>
 
@@ -223,9 +236,12 @@ export default function StudyPage() {
           />
         </div>
 
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <span className="text-success">✓ {view.metrics.successes}</span>
           <span className="text-danger">✕ {view.metrics.failures}</span>
+          <span className="text-accent">
+            {t("study.learnedCount", { count: view.metrics.learned })}
+          </span>
           <span className="text-muted">
             {t("study.accuracy", {
               value: Math.round(view.metrics.accuracy * 100),
@@ -246,13 +262,19 @@ export default function StudyPage() {
       {view.summary ? (
         <SummaryScreen
           summary={view.summary}
-          total={view.progress.total}
-          failedCount={view.failedIds.length}
-          undoAvailable={undoVisible}
+          mode={view.mode}
           busy={busy}
+          onStartReview={(statuses) =>
+            void act({ type: "review", statuses })
+          }
+          onFinish={() => {
+            void act({ type: "finish" }).then((next) => {
+              if (next) {
+                router.push("/library");
+              }
+            });
+          }}
           onNewRound={() => void act({ type: "new-round" })}
-          onReviewFailed={() => void act({ type: "review-failed" })}
-          onUndo={() => void act({ type: "undo" })}
         />
       ) : view.emptyDeck ? (
         <section className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
@@ -292,56 +314,28 @@ export default function StudyPage() {
               onFlip={() =>
                 void act({ type: "flip", flipped: !view.flipped })
               }
-              onResult={(result) => void act({ type: "result", result })}
               onHide={() => void act({ type: "hide" })}
-              onStatusChange={(status) =>
-                void act({ type: "status", status })
-              }
+              onStatusChange={requestStatus}
+              onNotFlipped={() => setError(t("study.error.notFlipped"))}
             />
           </div>
 
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              <ActionButton
-                label={t("study.fail")}
-                icon="✕"
-                tone="danger"
-                disabled={!view.flipped || busy}
-                onClick={() => void act({ type: "result", result: "f" })}
-              />
-              <ActionButton
-                label={t("study.hide")}
-                icon="🙈"
-                tone="neutral"
+          <div className="flex min-h-12 items-center justify-between gap-3">
+            <p className="text-xs text-muted">
+              {view.flipped
+                ? t("study.hintFlipped")
+                : t("study.hintUnflipped")}
+            </p>
+            {view.undoAvailable && (
+              <button
+                type="button"
+                onClick={() => void act({ type: "undo" })}
                 disabled={busy}
-                onClick={() => void act({ type: "hide" })}
-              />
-              <ActionButton
-                label={t("study.success")}
-                icon="✓"
-                tone="success"
-                disabled={!view.flipped || busy}
-                onClick={() => void act({ type: "result", result: "s" })}
-              />
-            </div>
-
-            <div className="flex min-h-12 items-center justify-between gap-3">
-              <p className="text-xs text-muted">
-                {view.flipped
-                  ? t("study.hintFlipped")
-                  : t("study.hintUnflipped")}
-              </p>
-              {undoVisible && (
-                <button
-                  type="button"
-                  onClick={() => void act({ type: "undo" })}
-                  disabled={busy}
-                  className="min-h-12 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
-                >
-                  {t("study.undo", { seconds: undoSeconds })}
-                </button>
-              )}
-            </div>
+                className="min-h-12 shrink-0 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
+              >
+                {t("study.undo", { count: view.undoCount })}
+              </button>
+            )}
           </div>
         </>
       ) : (
@@ -362,41 +356,44 @@ export default function StudyPage() {
           </button>
         </section>
       )}
+
+      {view.resumePending && !view.summary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="resume-title"
+            className="w-full max-w-sm space-y-4 rounded-3xl border border-border bg-surface p-5 shadow-2xl"
+          >
+            <div>
+              <h2 id="resume-title" className="text-lg font-semibold">
+                {t("study.resume.title")}
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                {t("study.resume.description")}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => void act({ type: "resume" })}
+                disabled={busy}
+                className="min-h-14 w-full rounded-2xl bg-accent px-5 text-base font-semibold text-accent-foreground disabled:opacity-50"
+              >
+                {t("study.resume.continue")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void act({ type: "reset" })}
+                disabled={busy}
+                className="min-h-12 w-full rounded-2xl border border-border px-5 text-sm font-medium disabled:opacity-50"
+              >
+                {t("study.resume.restart")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
-  );
-}
-
-function ActionButton({
-  label,
-  icon,
-  tone,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  icon: string;
-  tone: "success" | "danger" | "neutral";
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  const toneClass =
-    tone === "success"
-      ? "border-success/40 bg-success/15 text-success"
-      : tone === "danger"
-        ? "border-danger/40 bg-danger/15 text-danger"
-        : "border-border bg-surface-2 text-foreground";
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border text-xs font-semibold disabled:opacity-40 ${toneClass}`}
-    >
-      <span aria-hidden="true" className="text-xl leading-none">
-        {icon}
-      </span>
-      {label}
-    </button>
   );
 }

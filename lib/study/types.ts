@@ -19,4 +19,9 @@ export type StudyConfig = {
   /** null means "all categories". */
   categories: string[] | null;
   statuses: CardStatus[];
+  /**
+   * Continuous rounds keep repeating HARD/NEW cards until every card is
+   * EASY or LEARNED. Standard rounds are a single pass (NEW still repeats).
+   */
+  continuous: boolean;
 };

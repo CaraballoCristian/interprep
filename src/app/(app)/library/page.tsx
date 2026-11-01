@@ -16,7 +16,8 @@ import { useI18n } from "@/components/settings-provider";
 
 const STATUS_KEYS: Record<CardStatus, TranslationKey> = {
   new: "status.new",
-  learning: "status.learning",
+  easy: "status.easy",
+  hard: "status.hard",
   learned: "status.learned",
 };
 

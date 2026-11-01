@@ -54,7 +54,7 @@ App web para estudiar terminología específica de interpretación (Insurance, 9
 | termEng | text | requerido |
 | termEsp | text | requerido |
 | description | text | puede ser vacío |
-| status | enum | `new` \| `learning` \| `learned` (default `new`) |
+| status | enum | `new` \| `easy` \| `hard` \| `learned` (default `new`) |
 | hidden | boolean | **ortogonal al estado**; default false |
 | history | json | **últimos 10** resultados: array de `"s"` \| `"f"` (el más reciente al final) |
 | totalSuccess | integer | contador acumulado |
@@ -71,14 +71,15 @@ App web para estudiar terminología específica de interpretación (Insurance, 9
 | sideA | json | array no vacío de `"termEng"` \| `"termEsp"` \| `"description"` |
 | sideB | json | array no vacío, sin solapar con sideA |
 | categories | json \| null | `null` = todas |
-| statuses | json | subset de `new/learning/learned`; default las tres |
+| statuses | json | subset de `new/easy/hard/learned`; default `new/easy/hard` |
+| continuous | boolean | la vuelta no termina hasta que todo quede `easy` o `learned`; default false |
 | createdAt / updatedAt | text ISO | |
 
 ### `settings` (clave/valor, un solo registro lógico)
 `theme` (`dark`|`light`, default `dark`), `language` (`es`|`en`), `lastTemplateId`.
 
 ### `session_state` (un solo registro)
-Estado de la vuelta en curso, serializado: config activa (lados, categorías, estados), orden de la vuelta (ids), índice actual, ids ya vistos, ids fallados en la vuelta, contadores de la sesión, bandera de si la tarjeta actual está volteada. Se guarda tras cada acción.
+Estado de la vuelta en curso, serializado: config activa (lados, categorías, estados, modo continuo), cola de tarjetas, repeticiones pendientes (`new` 5–10 respuestas; `hard` 20–30 en continuo), respuestas y estado final por tarjeta, contadores de la sesión, si la tarjeta está volteada, pila de undo (máx. 20) y si corresponde ofrecer retomar la sesión. Se guarda tras cada acción.
 
 ---
 
@@ -87,17 +88,16 @@ Estado de la vuelta en curso, serializado: config activa (lados, categorías, es
 No hay "sincronización" con el Sheet ni modal de sync. Existe una pantalla de **Importar** (CSV/TSV subido o pegado).
 
 1. **Detección de encabezados**: mapear por **nombre de columna**, no por posición. Aliases (sin distinguir mayúsculas ni acentos):
-   - categoría: `categoría`, `category`
-   - estado: `estado`, `status`
+   - categoría: `categoría`, `category`, `industria`, `industry`
    - inglés: `inglés`, `ingles`, `english`, `term eng`, `término inglés`
    - español: `español`, `espanol`, `spanish`, `term esp`, `término español`
    - descripción: `descripción`, `description`
 2. Si algún encabezado requerido no se reconoce: mostrar un **selector por columna** para asignarlo manualmente.
-3. **Normalización de estado**: `Nueva/Nuevo/New` → `new`; `Aprendiendo/Learning` → `learning`; `Aprendida/Aprendido/Learned` → `learned`; vacío → `new`; valor desconocido → fila marcada con error.
-4. **Vista previa** antes de confirmar: primeras filas ya interpretadas, conteo de filas válidas / con error / vacías, y detalle de las filas con problema (campo requerido vacío, estado desconocido). Las filas con error se **saltean** (no bloquean el import).
+3. **Estado**: la columna `estado`/`status` del Sheet **se ignora**. Toda tarjeta nueva entra como `new`; las existentes conservan su estado.
+4. **Vista previa** antes de confirmar: primeras filas ya interpretadas, conteo de filas válidas / con error / vacías, y detalle de las filas con problema (campo requerido vacío). Las filas con error se **saltean** (no bloquean el import).
 5. **Reimportar**: si ya hay datos, se puede importar de nuevo con una advertencia clara. Para cada fila:
    - **Coincide** (por la clave normalizada de `termEng + termEsp`) → se actualizan `category` y `description` (y el texto de los términos); se **conservan** `status`, `hidden`, `history` y contadores.
-   - **No coincide** → se inserta como tarjeta nueva (con el estado del Sheet).
+   - **No coincide** → se inserta como tarjeta nueva con estado `new`.
    - Tarjetas que existen en la app pero **no vienen** en el archivo → **se conservan** (no se borran).
 6. La vista previa del reimport muestra cuántas se actualizan, cuántas son nuevas y cuántas se conservan sin cambios.
 
@@ -124,43 +124,47 @@ No hay "sincronización" con el Sheet ni modal de sync. Existe una pantalla de *
 Una tarjeta entra al mazo si cumple **todo**: `hidden = false`, su `status` está en los estados seleccionados, su `category` está en las categorías seleccionadas (o "todas").
 
 ### 5.3 Vuelta (round)
-- Una **vuelta** = recorrer **todas** las tarjetas del mazo filtrado **exactamente una vez**. Ninguna tarjeta se repite antes de terminar la vuelta (aunque se haya fallado).
-- Al terminar la vuelta se muestra la **pantalla de resumen** (ver 5.7).
+- **Vuelta estándar**: recorre todas las tarjetas del mazo una vez. `Nueva` se reprograma a las 5–10 respuestas; `Difícil` no se repite.
+- **Modo continuo**: la vuelta no termina hasta que **todas** las tarjetas del mazo queden en `Fácil` o `Aprendida`. `Nueva` se reprograma a las 5–10 respuestas y `Difícil` a las 20–30.
+- Las repeticiones pendientes siempre se muestran antes de que la vuelta pueda terminar.
+- Al terminar la vuelta se muestra el **modal de resumen** (ver 5.7).
 - Cambiar filtros, categorías, estados o template a mitad de vuelta **inicia una vuelta nueva** con el mazo recalculado.
 
 ### 5.4 Orden dentro de la vuelta
-Orden **aleatorio ponderado, sin reposición**, calculado al inicio de la vuelta:
+Orden **aleatorio ponderado**, calculado al inicio de la vuelta:
 - `peso = 1 + (cantidad de "f" en el history de las últimas 10)`.
 - Algoritmo sugerido (Efraimidis–Spirakis): para cada tarjeta `clave = random()^(1/peso)`; ordenar por clave descendente.
-- El orden queda fijo durante la vuelta (y se guarda en `session_state`).
+- El orden inicial queda fijo durante la vuelta (y se guarda en `session_state`). Las repeticiones se insertan dinámicamente según su demora.
 
-✔ Tests: en una vuelta no hay ids repetidos y están todos los del mazo.
+✔ Tests: la cola inicial no tiene ids repetidos y están todos los del mazo.
 ✔ Tests: con muchas simulaciones, las tarjetas de mayor peso aparecen en promedio antes.
 
 ### 5.5 Evaluación
-- **Acierto** / **Fallo**: se agrega `"s"`/`"f"` al `history` (si pasa de 10, se descarta el más antiguo), se incrementa el contador total correspondiente y se pasa a la siguiente tarjeta.
-- Los resultados se registran **solo** con la tarjeta volteada (el usuario vio la respuesta).
-- La tarjeta muestra el historial visual (ej. `✓ ✓ ✕ ✓`) con **íconos**, no solo color.
+- **Fácil** / **Difícil**: se agrega `"s"`/`"f"` al `history` (si pasa de 10, se descarta el más antiguo), se incrementa el contador total correspondiente y se pasa a la siguiente tarjeta. `Nueva` y `Aprendida` no tocan history ni contadores.
+- Las acciones de estado se registran **solo** con la tarjeta volteada; si no, se muestra «Girá la tarjeta primero».
+- La tarjeta muestra el historial visual (ej. `✓ ✓ ✕ ✓`) con **íconos**, no solo color, y también categoría/industria y estado actual.
 
 ### 5.6 Estado, ocultar y Undo
-- **Cambio de estado manual**: selector chico en la tarjeta (`Nueva` / `Aprendiendo` / `Aprendida`). Se persiste **inmediatamente**, sin modales. El estado **nunca** cambia solo ni se sugiere.
-- Si el nuevo estado queda fuera del filtro activo, la tarjeta sale del mazo restante (con Undo disponible).
+- **Cambio de estado**: flechas en la tarjeta (`↑` Aprendida, `↓` Nueva, `→` Fácil, `←` Difícil) más swipe en la misma dirección. Se persiste **inmediatamente**, sin modales. El estado **nunca** cambia solo ni se sugiere.
+- `Aprendida` es el estado de archivo: deja de aparecer en el estudio salvo que se seleccione explícitamente en los filtros.
+- En modo continuo, si el nuevo estado queda fuera del filtro activo, la tarjeta sale del mazo restante.
 - **Ocultar** (`hidden = true`): excluye la tarjeta de **todos** los mazos y templates presentes y futuros, hasta que se des-oculte desde la Biblioteca (ver 7). Es independiente del estado.
-- **Undo**: un botón visible durante ~8 segundos (o hasta que se resuelvan 3 tarjetas más, lo que ocurra primero) que revierte la **última acción**: acierto/fallo (revierte history y contadores), ocultar o cambio de estado. La tarjeta revertida vuelve a ser la tarjeta actual. Funciona aunque la tarjeta haya desaparecido por filtros, sin tocar los filtros.
+- **Undo**: permanente y multinivel (máx. 20 acciones). Revierte la última acción (estado u ocultar), restaura history/contadores/estado y vuelve a la tarjeta afectada, aunque haya salido por filtros. Se limpia al iniciar vuelta, repasar o aplicar filtros.
 
 ✔ Ocultar una tarjeta en un template la oculta en todos los demás.
-✔ Undo de un fallo restaura history, contadores y la tarjeta actual.
+✔ Undo de un cambio de estado restaura history, contadores, estado y la tarjeta actual.
 ✔ Cambiar estado no abre ningún modal.
 
 ### 5.7 Pantalla de resumen (fin de vuelta / mazo vacío)
-- **Fin de vuelta**: tarjetas vistas, aciertos, fallos, % de acierto. Botones: **Nueva vuelta**, **Repasar solo las falladas** (solo si hubo fallos; arma una vuelta con las falladas de la vuelta recién terminada, con el mismo orden ponderado), **Cambiar template/filtros**.
+- **Fin de vuelta estándar**: modal con tarjetas vistas, aciertos, fallos, % de acierto y conteo final por estado. Checkboxes `Nueva`/`Difícil`/`Fácil` (default: Nueva + Difícil) con `Empezar` para repasar esos estados de la vuelta recién terminada, y `Terminar` para cerrar la sesión e ir a la Biblioteca.
+- **Fin de vuelta continua**: modal con las mismas estadísticas y `Terminar` (más `Nueva vuelta`).
 - **Mazo vacío** (los filtros no devuelven tarjetas): mensaje claro y acceso directo a los filtros.
 
 ### 5.8 Métricas de sesión
-Visibles durante el estudio: progreso de la vuelta (`12 / 87`), aciertos, fallos y % de acierto de la sesión actual.
+Visibles durante el estudio: progreso (`vistas / total`), aciertos, fallos, `Aprendidas: N` y % de acierto de la vuelta actual.
 
 ### 5.9 Persistencia de la sesión
-Si se cierra la app a mitad de vuelta, al reabrir se **retoma exactamente** donde estaba: misma config, mismo orden, misma tarjeta, mismo lado (volteada o no) y mismos contadores.
+Al salir no se pregunta nada: la sesión se conserva. Al volver se pregunta **«¿Retomar la sesión actual?»**. Si se elige empezar de cero, se conservan estado, historial y contadores por tarjeta; la cola pendiente de `Nueva`/`Difícil` se descarta con la vuelta.
 
 ---
 
@@ -168,10 +172,12 @@ Si se cierra la app a mitad de vuelta, al reabrir se **retoma exactamente** dond
 
 ### Filtros
 - **Categorías**: desplegable con checkboxes (multiselección). Default: "Todas". Incluir "Seleccionar todas / ninguna". Las categorías se listan dinámicamente a partir de las tarjetas.
-- **Estados**: checkboxes `Nueva` / `Aprendiendo` / `Aprendida` (default: las tres).
+- **Estados**: checkboxes `Nueva` / `Fácil` / `Difícil` / `Aprendida`, con `Todas` / `Ninguna`. Default: `Nueva` / `Fácil` / `Difícil`.
+- **Modo continuo**: checkbox que se guarda con la config y con los templates.
+- Si hay una vuelta en curso, aplicar filtros pide confirmación.
 
 ### Templates
-- Un template guarda: **lado A, lado B, categorías y estados**, bajo un nombre libre (ej. "spa first_1", "banana").
+- Un template guarda: **lado A, lado B, categorías, estados y modo continuo**, bajo un nombre libre (ej. "spa first_1", "banana").
 - Acciones: guardar el config actual como template, aplicar, renombrar, sobrescribir y borrar.
 - **Al aplicar un template se carga toda la config de una y se inicia una vuelta nueva.**
 - Al abrir la app se carga automáticamente el **último template usado** (o la config de la sesión guardada, si hay una vuelta en curso).
@@ -204,19 +210,21 @@ Pantalla separada, accesible desde el menú:
 
 ### Gestos (mobile)
 - **Tap** en la tarjeta → voltear.
-- **Swipe derecha** → ✅ Acierto. **Swipe izquierda** → ❌ Fallo. (Solo con la tarjeta volteada.)
-- **Swipe arriba** → 🙈 Ocultar. (Permitido en cualquier momento, también sin voltear.)
-- Feedback durante el gesto: la tarjeta se inclina y aparece un overlay con **ícono + color** (✓ verde, ✕ rojo, ícono de ocultar neutro). Umbral de activación para evitar disparos accidentales; si no se supera, la tarjeta vuelve a su lugar.
-- **Botones visibles** ✅ / ❌ / ocultar / Undo como alternativa a los gestos (no depender solo del swipe).
+- **Swipe derecha** → `Fácil`. **Swipe izquierda** → `Difícil`. **Swipe arriba** → `Aprendida`. **Swipe abajo** → `Nueva`. Solo con la tarjeta volteada; si no, avisan que hay que girarla.
+- **Ocultar** tiene un botón propio.
+- Feedback durante el gesto: la tarjeta se inclina y aparece un overlay con **ícono + color** (→ Fácil, ← Difícil, ↑ Aprendida, ↓ Nueva). Umbral de activación para evitar disparos accidentales; si no se supera, la tarjeta vuelve a su lugar.
+- **Botones visibles** (D-pad de 4 flechas) como alternativa a los gestos (no depender solo del swipe).
 - Respetar `prefers-reduced-motion`.
 
 ### Atajos de teclado (desktop)
 | tecla | acción |
 |---|---|
 | `Espacio` / `Enter` | voltear |
-| `→` o `2` | acierto |
-| `←` o `1` | fallo |
-| `H` o `↑` | ocultar |
+| `→` o `2` | Fácil |
+| `←` o `1` | Difícil |
+| `↑` o `3` | Aprendida |
+| `↓` o `4` | Nueva |
+| `H` | ocultar |
 | `Z` | undo |
 
 (Fáciles de cambiar: centralizarlos en un único archivo de config.)
@@ -249,11 +257,11 @@ Pantalla separada, accesible desde el menú:
 
 Route handlers REST, validados con Zod, sobre una **capa de repositorio** (para poder cambiar la DB o agregar `userId` después):
 
+- `GET/POST /api/study`: vista de la vuelta actual y acciones (`flip`, `status`, `hide`, `undo`, `new-round`, `review`, `resume`, `reset`, `finish`, `leave`)
 - `GET/POST /api/cards`, `PATCH/DELETE /api/cards/:id`
-- `POST /api/cards/:id/result` (`s`/`f`), y endpoint para revertir (undo) la última acción
 - `POST /api/import/preview`, `POST /api/import/commit`
 - `GET /api/export?format=csv|json`
-- `GET/POST/PATCH/DELETE /api/templates`
+- `GET/POST /api/templates`, `PATCH/DELETE /api/templates/:id`, `POST /api/templates/:id/apply`
 - `GET/PUT /api/settings`, `GET/PUT /api/session`
 
 ---

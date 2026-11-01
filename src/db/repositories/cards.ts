@@ -76,7 +76,7 @@ export function applyImportPlan(plan: {
           termEng: card.termEng,
           termEsp: card.termEsp,
           description: card.description,
-          status: card.status,
+          status: "new" as const,
           hidden: false,
           history: [] as CardResult[],
           totalSuccess: 0,
@@ -156,6 +156,29 @@ export function updateCardStatus(id: string, status: CardStatus): void {
   getDb()
     .update(cards)
     .set({ status, updatedAt: new Date().toISOString() })
+    .where(eq(cards.id, id))
+    .run();
+}
+
+/** Updates the study-related fields of a card in a single write. */
+export function updateCardStudyFields(
+  id: string,
+  input: {
+    status: CardStatus;
+    history: CardResult[];
+    totalSuccess: number;
+    totalFail: number;
+  },
+): void {
+  getDb()
+    .update(cards)
+    .set({
+      status: input.status,
+      history: input.history,
+      totalSuccess: input.totalSuccess,
+      totalFail: input.totalFail,
+      updatedAt: new Date().toISOString(),
+    })
     .where(eq(cards.id, id))
     .run();
 }

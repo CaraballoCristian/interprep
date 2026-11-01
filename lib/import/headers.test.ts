@@ -22,7 +22,7 @@ describe("detectMapping", () => {
     expect(mapping.termEsp).toBe(1);
     expect(mapping.termEng).toBe(3);
     expect(mapping.category).toBe(4);
-    expect(mapping.status).toBe(5);
+    expect("status" in mapping).toBe(false);
   });
 
   it("accepts aliases with accents, case and spacing", () => {
@@ -30,15 +30,22 @@ describe("detectMapping", () => {
       "TERMINO INGLES",
       "término español",
       "Category",
-      "STATUS",
       "descripcion",
     ]);
 
     expect(mapping.termEng).toBe(0);
     expect(mapping.termEsp).toBe(1);
     expect(mapping.category).toBe(2);
-    expect(mapping.status).toBe(3);
-    expect(mapping.description).toBe(4);
+    expect(mapping.description).toBe(3);
+  });
+
+  it("accepts Industry and Industria as category aliases", () => {
+    expect(
+      detectMapping(["English", "Spanish", "Industry"]).category,
+    ).toBe(2);
+    expect(
+      detectMapping(["English", "Spanish", "Industria"]).category,
+    ).toBe(2);
   });
 
   it("ignores extra columns", () => {

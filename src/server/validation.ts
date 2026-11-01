@@ -7,7 +7,6 @@ export const importMappingSchema = z.object({
   termEng: columnIndex.optional(),
   termEsp: columnIndex.optional(),
   category: columnIndex.optional(),
-  status: columnIndex.optional(),
   description: columnIndex.optional(),
 });
 
@@ -29,6 +28,7 @@ export const studyConfigSchema = z.object({
   sideB: z.array(z.enum(SIDE_FIELDS)),
   categories: z.array(z.string()).nullable(),
   statuses: z.array(z.enum(CARD_STATUSES)),
+  continuous: z.boolean(),
 });
 
 export const sessionUpdateSchema = z.object({

@@ -1,6 +1,7 @@
 import type { StudyConfig } from "../study/types";
 import {
   CARD_STATUSES,
+  DEFAULT_CARD_STATUSES,
   SIDE_FIELDS,
   type CardStatus,
   type SideField,
@@ -49,12 +50,12 @@ export function sanitizeSide(value: unknown): SideField[] {
 }
 
 /**
- * Missing statuses default to all three. An explicit empty array means
- * "no statuses" and is kept as-is.
+ * Missing statuses default to NEW/EASY/HARD (LEARNED is opt-in). An explicit
+ * empty array means "no statuses" and is kept as-is.
  */
 export function sanitizeStatuses(value: unknown): CardStatus[] {
   if (!Array.isArray(value)) {
-    return [...CARD_STATUSES];
+    return [...DEFAULT_CARD_STATUSES];
   }
 
   const selected = new Set(
@@ -106,6 +107,7 @@ export function normalizeConfig(value: unknown): StudyConfig {
     sideB: sanitizeSide(input.sideB),
     categories: sanitizeCategories(input.categories),
     statuses: sanitizeStatuses(input.statuses),
+    continuous: input.continuous === true,
   };
 }
 

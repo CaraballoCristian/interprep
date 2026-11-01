@@ -7,7 +7,8 @@ function config(sideA: StudyConfig["sideA"], sideB: StudyConfig["sideB"]): Study
     sideA,
     sideB,
     categories: ["Insurance"],
-    statuses: ["new", "learning"],
+    statuses: ["new", "hard"],
+    continuous: false,
   };
 }
 
@@ -69,7 +70,7 @@ describe("toggleSideField", () => {
     const next = toggleSideField(config([], []), "sideA", "termEng");
 
     expect(next.categories).toEqual(["Insurance"]);
-    expect(next.statuses).toEqual(["new", "learning"]);
+    expect(next.statuses).toEqual(["new", "hard"]);
   });
 
   it("does not mutate the input config", () => {

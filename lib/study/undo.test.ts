@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import {
-  createUndoEntry,
-  isUndoAvailable,
-  markResolution,
-  UNDO_MAX_RESOLUTIONS,
-  UNDO_WINDOW_MS,
-} from "./undo";
+import { createRound } from "./round";
 import type { StudyCard } from "./types";
+import {
+  createSessionUndo,
+  createUndoEntry,
+  pushUndo,
+  UNDO_LIMIT,
+  undoAvailable,
+  type SessionUndo,
+} from "./undo";
 
 function card(overrides: Partial<StudyCard> = {}): StudyCard {
   return {
@@ -24,14 +26,17 @@ function card(overrides: Partial<StudyCard> = {}): StudyCard {
   };
 }
 
+function round() {
+  return createRound([card({ id: "c1" }), card({ id: "c2" })], "standard", () => 0.5);
+}
+
 describe("createUndoEntry", () => {
   it("snapshots the card state before the action", () => {
-    const entry = createUndoEntry("result", card(), 1_000);
+    const entry = createUndoEntry("status", card(), 1_000);
 
-    expect(entry.kind).toBe("result");
+    expect(entry.kind).toBe("status");
     expect(entry.cardId).toBe("c1");
     expect(entry.at).toBe(1_000);
-    expect(entry.resolutionsAfter).toBe(0);
     expect(entry.snapshot).toMatchObject({
       id: "c1",
       history: ["s", "f"],
@@ -41,37 +46,57 @@ describe("createUndoEntry", () => {
       hidden: false,
     });
   });
+
+  it("does not share the history array with the card", () => {
+    const source = card();
+    const entry = createUndoEntry("hide", source, 1_000);
+
+    source.history.push("s");
+
+    expect(entry.snapshot.history).toEqual(["s", "f"]);
+  });
 });
 
-describe("isUndoAvailable", () => {
-  it("is false without an entry", () => {
-    expect(isUndoAvailable(null, 1_000)).toBe(false);
+describe("createSessionUndo", () => {
+  it("stores a clone of the round and the flip state", () => {
+    const current = round();
+    const undo = createSessionUndo("status", card(), current, true, 5_000);
+
+    expect(undo.flipped).toBe(true);
+    expect(undo.round).not.toBe(current);
+    expect(undo.round.deck).toEqual(current.deck);
+
+    const queued = undo.round.queue.length;
+    current.queue.length = 0;
+    expect(undo.round.queue).toHaveLength(queued);
+  });
+});
+
+describe("pushUndo", () => {
+  it("appends entries and keeps only the last 20", () => {
+    let stack: SessionUndo[] = [];
+    for (let index = 0; index < UNDO_LIMIT + 5; index += 1) {
+      stack = pushUndo(
+        stack,
+        createSessionUndo("status", card(), round(), false, index),
+      );
+    }
+
+    expect(stack).toHaveLength(UNDO_LIMIT);
+    expect(stack[stack.length - 1].entry.at).toBe(UNDO_LIMIT + 4);
+  });
+});
+
+describe("undoAvailable", () => {
+  it("is false for an empty stack", () => {
+    expect(undoAvailable([])).toBe(false);
   });
 
-  it("is available within the time window", () => {
-    const entry = createUndoEntry("result", card(), 1_000);
-    expect(isUndoAvailable(entry, 1_000)).toBe(true);
-    expect(isUndoAvailable(entry, 1_000 + UNDO_WINDOW_MS - 1)).toBe(true);
-  });
-
-  it("expires after the time window", () => {
-    const entry = createUndoEntry("result", card(), 1_000);
-    expect(isUndoAvailable(entry, 1_000 + UNDO_WINDOW_MS)).toBe(false);
-  });
-
-  it("expires after three more resolutions", () => {
-    let entry = createUndoEntry("result", card(), 1_000);
-
-    entry = markResolution(entry) as typeof entry;
-    entry = markResolution(entry) as typeof entry;
-    expect(isUndoAvailable(entry, 1_001)).toBe(true);
-
-    entry = markResolution(entry) as typeof entry;
-    expect(entry.resolutionsAfter).toBe(UNDO_MAX_RESOLUTIONS);
-    expect(isUndoAvailable(entry, 1_001)).toBe(false);
-  });
-
-  it("markResolution is null-safe", () => {
-    expect(markResolution(null)).toBeNull();
+  it("is true when there is at least one entry", () => {
+    const stack = pushUndo(
+      [],
+      createSessionUndo("status", card(), round(), false, 1_000),
+    );
+    expect(undoAvailable(stack)).toBe(true);
   });
 });

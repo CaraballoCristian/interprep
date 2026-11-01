@@ -18,10 +18,12 @@ export function loadStudySession(): StudySession | null {
     const data = row.data as unknown as StudySession;
     if (
       !data ||
-      data.version !== 1 ||
+      data.version !== 2 ||
       !data.config ||
       !data.round ||
-      !Array.isArray(data.round.order)
+      !Array.isArray(data.round.deck) ||
+      !Array.isArray(data.round.queue) ||
+      !Array.isArray(data.undoStack)
     ) {
       return null;
     }

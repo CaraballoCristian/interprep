@@ -54,7 +54,7 @@ describe("snapshotCard / restoreCard", () => {
       history: ["s", "f", "s"],
       totalSuccess: 2,
       totalFail: 1,
-      status: "learning",
+      status: "hard",
       hidden: false,
     });
     const snapshot = snapshotCard(before);
@@ -65,7 +65,7 @@ describe("snapshotCard / restoreCard", () => {
       history: ["s", "f", "s"],
       totalSuccess: 2,
       totalFail: 1,
-      status: "learning",
+      status: "hard",
       hidden: false,
     });
   });

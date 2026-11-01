@@ -3,8 +3,13 @@ import {
   createReviewRound,
   createRound,
   currentCardId,
+  HARD_DELAY_MAX,
+  HARD_DELAY_MIN,
   isRoundComplete,
-  recordRoundResult,
+  NEW_DELAY_MAX,
+  NEW_DELAY_MIN,
+  recordStatus,
+  refillRound,
   removeCurrentFromRound,
   summarizeRound,
 } from "./round";
@@ -30,22 +35,26 @@ function fixedRandom(value: number): () => number {
   return () => value;
 }
 
-describe("createRound", () => {
-  it("includes every deck card exactly once", () => {
-    const cards = [card("a"), card("b"), card("c")];
-    const round = createRound(cards);
+const ALL_SELECTED = ["new", "easy", "hard", "learned"] as const;
 
-    expect(round.order).toHaveLength(3);
-    expect(new Set(round.order)).toEqual(new Set(["a", "b", "c"]));
-    expect(round.index).toBe(0);
-    expect(round.results).toEqual({});
+describe("createRound", () => {
+  it("includes every deck card exactly once in the queue", () => {
+    const cards = [card("a"), card("b"), card("c")];
+    const round = createRound(cards, "standard", fixedRandom(0.5));
+
+    expect(round.deck).toHaveLength(3);
+    expect(new Set(round.deck)).toEqual(new Set(["a", "b", "c"]));
+    expect(round.queue).toEqual(round.deck);
+    expect(round.pending).toEqual([]);
+    expect(round.answered).toBe(0);
     expect(round.seen).toEqual([]);
-    expect(round.failed).toEqual([]);
+    expect(round.resolved).toEqual({});
+    expect(round.mode).toBe("standard");
   });
 
-  it("starts at the first card of the order", () => {
-    const round = createRound([card("a"), card("b")], fixedRandom(0.5));
-    expect(currentCardId(round)).toBe(round.order[0]);
+  it("starts at the first card of the queue", () => {
+    const round = createRound([card("a"), card("b")], "standard", fixedRandom(0.5));
+    expect(currentCardId(round)).toBe(round.deck[0]);
     expect(isRoundComplete(round)).toBe(false);
   });
 
@@ -54,67 +63,217 @@ describe("createRound", () => {
     expect(currentCardId(round)).toBeNull();
     expect(isRoundComplete(round)).toBe(true);
   });
+
+  it("uses continuous mode when requested", () => {
+    expect(createRound([card("a")], "continuous").mode).toBe("continuous");
+  });
 });
 
-describe("recordRoundResult", () => {
+describe("recordStatus", () => {
   it("records the current card and advances", () => {
-    const round = createRound([card("a"), card("b")], fixedRandom(0.5));
-    const [first, second] = round.order;
+    const round = createRound([card("a"), card("b")], "standard", fixedRandom(0.5));
+    const [first, second] = round.deck;
 
-    const next = recordRoundResult(round, first, "s");
+    const next = recordStatus(round, first, "easy", {
+      selectedStatuses: ALL_SELECTED,
+    });
 
-    expect(next.index).toBe(1);
-    expect(next.results[first]).toBe("s");
+    expect(next.answered).toBe(1);
+    expect(next.resolved[first]).toBe("easy");
     expect(next.seen).toEqual([first]);
-    expect(next.failed).toEqual([]);
+    expect(next.counts.easy).toBe(1);
     expect(currentCardId(next)).toBe(second);
   });
 
-  it("tracks failures for the review round", () => {
-    const round = createRound([card("a"), card("b")], fixedRandom(0.5));
-    const [first, second] = round.order;
+  it("ignores statuses for cards that are not current", () => {
+    const round = createRound([card("a"), card("b")], "standard", fixedRandom(0.5));
+    const [first, second] = round.deck;
 
-    const afterFirst = recordRoundResult(round, first, "f");
-    const afterSecond = recordRoundResult(afterFirst, second, "f");
-
-    expect(afterSecond.failed).toEqual([first, second]);
-    expect(isRoundComplete(afterSecond)).toBe(true);
+    expect(
+      recordStatus(round, second, "easy", { selectedStatuses: ALL_SELECTED }),
+    ).toBe(round);
+    expect(
+      recordStatus(round, "unknown", "easy", {
+        selectedStatuses: ALL_SELECTED,
+      }),
+    ).toBe(round);
   });
 
-  it("ignores results for cards that are not current", () => {
-    const round = createRound([card("a"), card("b")], fixedRandom(0.5));
-    const [first, second] = round.order;
+  it("schedules a NEW repeat after the minimum delay", () => {
+    const round = createRound([card("a"), card("b")], "standard", fixedRandom(0));
+    const [first] = round.deck;
 
-    expect(recordRoundResult(round, second, "s")).toBe(round);
-    expect(recordRoundResult(round, "unknown", "s")).toBe(round);
+    const next = recordStatus(round, first, "new", {
+      selectedStatuses: ALL_SELECTED,
+      random: fixedRandom(0),
+    });
+
+    expect(next.pending).toEqual([
+      { cardId: first, dueAt: 1 + NEW_DELAY_MIN - 1 },
+    ]);
   });
 
-  it("does not repeat a card within the same round", () => {
-    const cards = [card("a"), card("b"), card("c")];
-    let round = createRound(cards);
+  it("schedules a NEW repeat after the maximum delay", () => {
+    const round = createRound([card("a"), card("b")], "standard");
+    const first = round.deck[0];
 
-    while (!isRoundComplete(round)) {
-      const id = currentCardId(round);
-      expect(id).not.toBeNull();
-      expect(round.seen).not.toContain(id);
-      round = recordRoundResult(round, id as string, "s");
-    }
+    const next = recordStatus(round, first, "new", {
+      selectedStatuses: ALL_SELECTED,
+      random: fixedRandom(0.999999),
+    });
 
-    expect(round.seen).toHaveLength(cards.length);
-    expect(new Set(round.seen).size).toBe(cards.length);
+    expect(next.pending[0].dueAt).toBe(NEW_DELAY_MAX);
+  });
+
+  it("does not repeat HARD in standard mode", () => {
+    const round = createRound([card("a"), card("b")], "standard");
+    const first = round.deck[0];
+
+    const next = recordStatus(round, first, "hard", {
+      selectedStatuses: ALL_SELECTED,
+    });
+
+    expect(next.pending).toEqual([]);
+  });
+
+  it("repeats HARD in continuous mode within the 20-30 range", () => {
+    const round = createRound([card("a"), card("b")], "continuous");
+    const first = round.deck[0];
+
+    const next = recordStatus(round, first, "hard", {
+      selectedStatuses: ALL_SELECTED,
+      random: fixedRandom(0),
+    });
+
+    expect(next.pending).toEqual([
+      { cardId: first, dueAt: 1 + HARD_DELAY_MIN - 1 },
+    ]);
+
+    const late = recordStatus(round, first, "hard", {
+      selectedStatuses: ALL_SELECTED,
+      random: fixedRandom(0.999999),
+    });
+    expect(late.pending[0].dueAt).toBe(HARD_DELAY_MAX);
+  });
+
+  it("does not repeat EASY or LEARNED", () => {
+    const round = createRound([card("a"), card("b")], "continuous");
+
+    const easy = recordStatus(round, round.deck[0], "easy", {
+      selectedStatuses: ALL_SELECTED,
+    });
+    expect(easy.pending).toEqual([]);
+
+    const learned = recordStatus(round, round.deck[0], "learned", {
+      selectedStatuses: ALL_SELECTED,
+    });
+    expect(learned.pending).toEqual([]);
+  });
+
+  it("drops a card from a continuous round when its status is filtered out", () => {
+    const round = createRound([card("a"), card("b")], "continuous");
+
+    const next = recordStatus(round, round.deck[0], "easy", {
+      selectedStatuses: ["new", "hard"],
+    });
+
+    expect(next.deck).not.toContain(round.deck[0]);
+  });
+
+  it("keeps a filtered-out card in a standard round", () => {
+    const round = createRound([card("a"), card("b")], "standard");
+
+    const next = recordStatus(round, round.deck[0], "easy", {
+      selectedStatuses: ["new", "hard"],
+    });
+
+    expect(next.deck).toContain(round.deck[0]);
+  });
+});
+
+describe("refillRound", () => {
+  it("moves due repeats into the queue", () => {
+    const round = createRound([card("a"), card("b")], "standard");
+    round.pending = [{ cardId: "a", dueAt: 1 }];
+    round.answered = 1;
+
+    const next = refillRound(round);
+
+    expect(next.queue).toContain("a");
+    expect(next.pending).toEqual([]);
+  });
+
+  it("flushes every pending card when the queue is empty", () => {
+    const round = createRound([card("a")], "standard");
+    round.queue = [];
+    round.pending = [
+      { cardId: "a", dueAt: 99 },
+      { cardId: "b", dueAt: 50 },
+    ];
+
+    const next = refillRound(round);
+
+    expect(next.queue).toEqual(["b", "a"]);
+    expect(next.pending).toEqual([]);
+  });
+});
+
+describe("isRoundComplete", () => {
+  it("completes a standard round after a single pass", () => {
+    let round = createRound([card("a"), card("b")], "standard");
+    round = recordStatus(round, currentCardId(round) as string, "hard", {
+      selectedStatuses: ALL_SELECTED,
+    });
+    round = recordStatus(round, currentCardId(round) as string, "easy", {
+      selectedStatuses: ALL_SELECTED,
+    });
+
+    expect(isRoundComplete(round)).toBe(true);
+  });
+
+  it("does not complete a continuous round until every card is EASY or LEARNED", () => {
+    let round = createRound([card("a"), card("b")], "continuous");
+    round = recordStatus(round, currentCardId(round) as string, "easy", {
+      selectedStatuses: ALL_SELECTED,
+    });
+
+    expect(isRoundComplete(round)).toBe(false);
+
+    round = recordStatus(round, currentCardId(round) as string, "learned", {
+      selectedStatuses: ALL_SELECTED,
+    });
+
+    expect(isRoundComplete(round)).toBe(true);
+  });
+
+  it("never ends while a repeat is still pending", () => {
+    let round = createRound([card("a")], "standard");
+    round = recordStatus(round, "a", "new", {
+      selectedStatuses: ALL_SELECTED,
+      random: fixedRandom(0),
+    });
+
+    expect(round.queue).toEqual(["a"]);
+    expect(isRoundComplete(round)).toBe(false);
+
+    round = recordStatus(round, "a", "easy", {
+      selectedStatuses: ALL_SELECTED,
+    });
+
+    expect(isRoundComplete(round)).toBe(true);
   });
 });
 
 describe("removeCurrentFromRound", () => {
   it("removes the current card and points to the next one", () => {
-    const round = createRound([card("a"), card("b"), card("c")], fixedRandom(0.5));
-    const [first, second] = round.order;
+    const round = createRound([card("a"), card("b"), card("c")], "standard", fixedRandom(0.5));
+    const [first, second] = round.deck;
 
     const next = removeCurrentFromRound(round);
 
-    expect(next.order).not.toContain(first);
+    expect(next.deck).not.toContain(first);
+    expect(next.queue).not.toContain(first);
     expect(currentCardId(next)).toBe(second);
-    expect(next.index).toBe(0);
   });
 
   it("does nothing when the round is complete", () => {
@@ -124,18 +283,24 @@ describe("removeCurrentFromRound", () => {
 });
 
 describe("summarizeRound", () => {
-  it("counts seen cards, successes, failures and accuracy", () => {
-    const round = createRound([card("a"), card("b"), card("c")], fixedRandom(0.5));
-    const [first, second, third] = round.order;
+  it("counts seen cards, answers, final statuses and accuracy", () => {
+    let round = createRound([card("a"), card("b"), card("c")], "standard", fixedRandom(0.5));
+    const [first, second, third] = round.deck;
 
-    let current = recordRoundResult(round, first, "s");
-    current = recordRoundResult(current, second, "f");
-    current = recordRoundResult(current, third, "s");
+    round = recordStatus(round, first, "easy", { selectedStatuses: ALL_SELECTED });
+    round = recordStatus(round, second, "hard", { selectedStatuses: ALL_SELECTED });
+    round = recordStatus(round, third, "easy", { selectedStatuses: ALL_SELECTED });
 
-    expect(summarizeRound(current)).toEqual({
+    expect(summarizeRound(round)).toEqual({
       seen: 3,
+      total: 3,
       successes: 2,
       failures: 1,
+      learned: 0,
+      newCount: 0,
+      easyCount: 2,
+      hardCount: 1,
+      learnedCount: 0,
       accuracy: 2 / 3,
     });
   });
@@ -143,29 +308,53 @@ describe("summarizeRound", () => {
   it("returns zero accuracy for an empty round", () => {
     expect(summarizeRound(createRound([]))).toEqual({
       seen: 0,
+      total: 0,
       successes: 0,
       failures: 0,
+      learned: 0,
+      newCount: 0,
+      easyCount: 0,
+      hardCount: 0,
+      learnedCount: 0,
       accuracy: 0,
     });
+  });
+
+  it("tracks learned cards", () => {
+    let round = createRound([card("a"), card("b")], "standard");
+    round = recordStatus(round, round.deck[0], "learned", {
+      selectedStatuses: ALL_SELECTED,
+    });
+
+    expect(summarizeRound(round).learned).toBe(1);
+    expect(summarizeRound(round).learnedCount).toBe(1);
   });
 });
 
 describe("createReviewRound", () => {
-  it("contains only the failed cards", () => {
+  it("contains only the cards with the selected final statuses", () => {
     const cards = [card("a"), card("b"), card("c")];
-    const review = createReviewRound(cards, ["a", "c"], fixedRandom(0.5));
+    let round = createRound(cards, "standard", fixedRandom(0.5));
+    const [first, second, third] = round.deck;
+    round = recordStatus(round, first, "easy", { selectedStatuses: ALL_SELECTED });
+    round = recordStatus(round, second, "hard", { selectedStatuses: ALL_SELECTED });
+    round = recordStatus(round, third, "learned", { selectedStatuses: ALL_SELECTED });
 
-    expect(new Set(review.order)).toEqual(new Set(["a", "c"]));
-    expect(review.order).toHaveLength(2);
+    const review = createReviewRound(
+      cards,
+      round,
+      ["hard", "learned"],
+      fixedRandom(0.5),
+    );
+
+    expect(new Set(review.deck)).toEqual(new Set([second, third]));
+    expect(review.mode).toBe("standard");
   });
 
-  it("is empty when nothing failed", () => {
-    const review = createReviewRound([card("a")], []);
-    expect(review.order).toEqual([]);
-  });
-
-  it("ignores failed ids that are not in the deck", () => {
-    const review = createReviewRound([card("a")], ["a", "missing"]);
-    expect(review.order).toEqual(["a"]);
+  it("is empty when no card matches", () => {
+    const review = createReviewRound([card("a")], createRound([], "standard"), [
+      "hard",
+    ]);
+    expect(review.deck).toEqual([]);
   });
 });

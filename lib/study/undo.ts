@@ -1,13 +1,11 @@
 import { snapshotCard, type CardSnapshot } from "./history";
+import { cloneRound, type RoundState } from "./round";
 import type { StudyCard } from "./types";
 
-/** How long the undo button stays visible. */
-export const UNDO_WINDOW_MS = 8_000;
+/** Maximum number of undoable actions kept in the session. */
+export const UNDO_LIMIT = 20;
 
-/** The undo is hidden after this many additional cards are resolved. */
-export const UNDO_MAX_RESOLUTIONS = 3;
-
-export type UndoKind = "result" | "status" | "hide";
+export type UndoKind = "status" | "hide";
 
 export type UndoEntry = {
   kind: UndoKind;
@@ -16,8 +14,14 @@ export type UndoEntry = {
   snapshot: CardSnapshot;
   /** Timestamp (ms) when the action happened. */
   at: number;
-  /** Results resolved after this action. */
-  resolutionsAfter: number;
+};
+
+/** Everything needed to step back one action. */
+export type SessionUndo = {
+  entry: UndoEntry;
+  /** Round state before the undoable action. */
+  round: RoundState;
+  flipped: boolean;
 };
 
 export function createUndoEntry(
@@ -30,29 +34,31 @@ export function createUndoEntry(
     cardId: card.id,
     snapshot: snapshotCard(card),
     at,
-    resolutionsAfter: 0,
   };
 }
 
-export function isUndoAvailable(
-  entry: UndoEntry | null,
-  now: number,
-): boolean {
-  if (!entry) {
-    return false;
-  }
-  if (entry.resolutionsAfter >= UNDO_MAX_RESOLUTIONS) {
-    return false;
-  }
-  return now - entry.at < UNDO_WINDOW_MS;
+export function createSessionUndo(
+  kind: UndoKind,
+  card: StudyCard,
+  round: RoundState,
+  flipped: boolean,
+  at: number,
+): SessionUndo {
+  return {
+    entry: createUndoEntry(kind, card, at),
+    round: cloneRound(round),
+    flipped,
+  };
 }
 
-/**
- * Increments the counter of results resolved since the undoable action.
- */
-export function markResolution(entry: UndoEntry | null): UndoEntry | null {
-  if (!entry) {
-    return null;
-  }
-  return { ...entry, resolutionsAfter: entry.resolutionsAfter + 1 };
+/** Appends an action and keeps only the last `UNDO_LIMIT` entries. */
+export function pushUndo(
+  stack: readonly SessionUndo[],
+  entry: SessionUndo,
+): SessionUndo[] {
+  return [...stack, entry].slice(-UNDO_LIMIT);
+}
+
+export function undoAvailable(stack: readonly SessionUndo[]): boolean {
+  return stack.length > 0;
 }

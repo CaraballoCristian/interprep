@@ -36,11 +36,13 @@ describe("dictionaries", () => {
 
 describe("translate", () => {
   it("returns the Spanish source text", () => {
-    expect(translate("es", "status.learning")).toBe("Aprendiendo");
+    expect(translate("es", "status.easy")).toBe("Fácil");
+    expect(translate("es", "status.hard")).toBe("Difícil");
   });
 
   it("returns the English text", () => {
-    expect(translate("en", "status.learning")).toBe("Learning");
+    expect(translate("en", "status.easy")).toBe("Easy");
+    expect(translate("en", "status.hard")).toBe("Hard");
   });
 
   it("interpolates parameters", () => {

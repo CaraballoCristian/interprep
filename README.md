@@ -113,8 +113,9 @@ Pantalla `/import`: se sube un CSV/TSV o se pega el texto.
   el mapeo a los campos de la app se hace por alias ES/EN, sin distinguir
   mayúsculas ni acentos. Si falta una columna requerida, la UI permite
   asignarla a mano.
-- Estados: `Nueva/Nuevo/New` → `new`, `Aprendiendo/Learning` → `learning`,
-  `Aprendida/Aprendido/Learned` → `learned`, vacío → `new`.
+- La columna de estado de la planilla (`Estado`/`Status`) **se ignora por
+  completo**: toda tarjeta nueva entra como `Nueva`, y las existentes conservan
+  su estado. `Industry`/`Industria` se aceptan como alias de categoría.
 - La vista previa muestra filas válidas, con error y vacías, el detalle de las
   filas problemáticas y (si ya hay datos) cuántas se actualizan, cuántas son
   nuevas y cuántas se conservan. Las filas con error se saltean.
@@ -127,28 +128,38 @@ Pantalla `/import`: se sube un CSV/TSV o se pega el texto.
 
 Pantalla `/` (antes `/study`), mobile-first y usable a 360px:
 
-- La tarjeta se voltea tocándola (o con `Espacio`/`Enter`). Los resultados
-  (`Acierto`/`Fallo`) solo se registran con la tarjeta volteada.
-- **Gestos**: swipe a la derecha = acierto, a la izquierda = fallo (solo con la
-  tarjeta volteada), swipe hacia arriba = ocultar. Los botones visibles hacen
-  lo mismo, sin depender del gesto.
-- **Estado manual**: selector `Nueva / Aprendiendo / Aprendida` dentro de la
-  tarjeta. Se persiste al instante. Si el estado elegido queda fuera del filtro
-  activo, la tarjeta sale de la vuelta restante (con Undo disponible).
+- La tarjeta se voltea tocándola (o con `Espacio`/`Enter`). **Toda** acción de
+  estado requiere la tarjeta volteada; si no, se muestra «Girá la tarjeta
+  primero». Las flechas mapean `↑` Aprendida (archivar), `↓` Nueva,
+  `→` Fácil y `←` Difícil.
+- **Gestos**: swipe a la derecha = Fácil, a la izquierda = Difícil, arriba =
+  Aprendida, abajo = Nueva. Con la tarjeta sin voltear solo avisan que hay que
+  girarla. Ocultar tiene su propio botón.
+- **Estado**: la tarjeta muestra categoría/industria y el estado actual. `Fácil`
+  y `Difícil` actualizan historial y contadores; `Nueva` y `Aprendida` no.
+  `Aprendida` deja de aparecer en el estudio.
+- **Repeticiones**: `Nueva` vuelve a aparecer a las 5–10 respuestas (aleatorio)
+  en ambos modos. `Difícil` vuelve a las 20–30 respuestas solo en modo
+  continuo. Las tarjetas pendientes siempre aparecen antes de terminar la
+  vuelta.
+- **Modo continuo**: la vuelta no termina hasta que todas las tarjetas queden
+  en `Fácil` o `Aprendida`. La cola pendiente se guarda al salir y se retoma al
+  volver.
 - **Ocultar**: excluye la tarjeta de todos los mazos y templates hasta
   des-ocultarla desde la Biblioteca.
-- **Undo**: botón visible ~8 s para revertir la última acción (resultado,
-  cambio de estado u ocultar). Restaura historial, contadores, estado, la
-  vuelta y la tarjeta actual, aunque la tarjeta haya salido por filtros.
-- **Atajos de teclado**: `Espacio`/`Enter` voltear, `→`/`2` acierto,
-  `←`/`1` fallo, `H`/`↓` ocultar, `Z` undo. Se centralizan en
-  `src/config/keyboard.ts`.
-- La sesión se guarda en `session_state` después de cada acción: al reabrir se
-  retoma con la misma config, orden, tarjeta, lado (volteada o no) y
-  contadores.
-- Al terminar la vuelta se muestra el resumen (vistas, aciertos, fallos y %)
-  con `Nueva vuelta`, `Repasar solo las falladas` (si hubo fallos) y el acceso
-  a filtros/templates.
+- **Undo**: permanente y multinivel (hasta 20 acciones). Cada cambio de estado
+  u ocultar se puede deshacer y vuelve a la tarjeta afectada. Se limpia al
+  iniciar una vuelta, repasar o aplicar filtros.
+- **Atajos de teclado**: `Espacio`/`Enter` voltear, `→`/`2` Fácil,
+  `←`/`1` Difícil, `↑`/`3` Aprendida, `↓`/`4` Nueva, `H` ocultar, `Z` undo. Se
+  centralizan en `src/config/keyboard.ts`.
+- La sesión se guarda en `session_state` después de cada acción. Al salir no se
+  pregunta nada; al volver se ofrece «¿Retomar la sesión actual?». Si se elige
+  empezar de cero, se conservan estado, historial y contadores por tarjeta.
+- Al terminar una vuelta estándar se muestra un modal con estadísticas y
+  checkboxes `Nueva`/`Difícil`/`Fácil` (por defecto Nueva + Difícil) para
+  `Empezar` un repaso o `Terminar`. En modo continuo se muestra el resumen con
+  `Terminar` y `Nueva vuelta`. Se muestran `Aprendidas: N` durante la vuelta.
 
 ## Filtros y templates
 
@@ -161,12 +172,16 @@ Pantalla `/filters`:
 - **Categorías**: se listan dinámicamente desde las tarjetas, con checkboxes y
   acciones `Todas` / `Ninguna`. `Todas` es dinámico (las categorías nuevas
   entran solas); `Ninguna` deja el mazo vacío.
-- **Estados**: checkboxes `Nueva / Aprendiendo / Aprendida`. Sin estados el
-  mazo queda vacío (es una configuración válida).
+- **Estados**: checkboxes `Nueva / Fácil / Difícil / Aprendida`, con acciones
+  `Todas` / `Ninguna`. El default es `Nueva / Fácil / Difícil` (Aprendida es el
+  archivo y queda fuera salvo que se marque). Sin estados el mazo queda vacío
+  (es una configuración válida).
+- **Modo continuo**: se guarda con la config y con los templates. Si hay una
+  vuelta en curso, aplicar filtros pide confirmación y empieza de cero.
 - **Aplicar**: guarda la config en la sesión y arranca una vuelta nueva con el
-  mazo recalculado. Cambiar filtros a mitad de vuelta empieza de cero.
-- **Templates**: guardan lados, categorías y estados bajo un nombre único
-  (máx. 80). Acciones: guardar la config actual, aplicar, renombrar,
+  mazo recalculado.
+- **Templates**: guardan lados, categorías, estados y modo continuo bajo un
+  nombre único (máx. 80). Acciones: guardar la config actual, aplicar, renombrar,
   sobrescribir y borrar. Guardar, renombrar y sobrescribir **no** aplican el
   template ni tocan la vuelta en curso; aplicar sí inicia una vuelta nueva y
   recuerda el template como último usado.

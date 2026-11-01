@@ -39,7 +39,7 @@ const cards: LibraryCard[] = [
     termEng: "Hearing",
     termEsp: "Audiencia",
     category: "Court",
-    status: "learning",
+    status: "hard",
     hidden: true,
   }),
   card({
@@ -72,14 +72,14 @@ describe("normalizeLibraryFilter", () => {
     const input: LibraryFilter = {
       search: "  policy ",
       category: "Insurance",
-      status: "learning",
+      status: "hard",
       hidden: "hidden",
     };
 
     expect(normalizeLibraryFilter(input)).toEqual({
       search: "policy",
       category: "Insurance",
-      status: "learning",
+      status: "hard",
       hidden: "hidden",
     });
   });
@@ -180,7 +180,7 @@ describe("filterCards", () => {
       "policy",
       "uncategorized",
     ]);
-    expect(ids(filterCards(cards, filter({ status: "learning" })))).toEqual([
+    expect(ids(filterCards(cards, filter({ status: "hard" })))).toEqual([
       "hearing",
     ]);
     expect(ids(filterCards(cards, filter({ status: "learned" })))).toEqual([

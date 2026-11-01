@@ -1,47 +1,54 @@
-import type { CardResult, CardStatus } from "../types";
-import type { RoundState, RoundSummary } from "./round";
+import type { CardStatus } from "../types";
+import type { RoundMode, RoundState, RoundSummary } from "./round";
 import type { StudyCard, StudyConfig } from "./types";
-import type { UndoEntry } from "./undo";
+import type { SessionUndo } from "./undo";
+
+export type { SessionUndo } from "./undo";
 
 /** Serializable session persisted in `session_state`. */
 export type StudySession = {
-  version: 1;
+  version: 2;
   config: StudyConfig;
   templateId: string | null;
   round: RoundState;
   flipped: boolean;
-  undo: SessionUndo | null;
+  undoStack: SessionUndo[];
+  /** True when the next visit should ask whether to resume. */
+  resumePending: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
-export type SessionUndo = {
-  entry: UndoEntry;
-  /** Round state before the undoable action. */
-  round: RoundState;
-  flipped: boolean;
+export type ReviewOption = {
+  status: CardStatus;
+  count: number;
 };
 
 /** Payload consumed by the study screen. */
 export type StudyView = {
   config: StudyConfig;
   templateId: string | null;
+  mode: RoundMode;
   flipped: boolean;
   card: StudyCard | null;
-  progress: { index: number; total: number; seen: number };
+  progress: { seen: number; total: number; answered: number };
   metrics: RoundSummary;
   summary: RoundSummary | null;
-  failedIds: string[];
+  reviewOptions: ReviewOption[];
   undoAvailable: boolean;
-  undoExpiresAt: number | null;
+  undoCount: number;
+  resumePending: boolean;
   emptyDeck: boolean;
 };
 
 export type StudyAction =
   | { type: "flip"; flipped: boolean }
-  | { type: "result"; result: CardResult }
   | { type: "status"; status: CardStatus }
   | { type: "hide" }
   | { type: "undo" }
   | { type: "new-round" }
-  | { type: "review-failed" };
+  | { type: "review"; statuses: CardStatus[] }
+  | { type: "resume" }
+  | { type: "reset" }
+  | { type: "finish" }
+  | { type: "leave" };

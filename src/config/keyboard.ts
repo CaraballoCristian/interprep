@@ -4,9 +4,11 @@
  */
 export const KEYBOARD_SHORTCUTS = {
   flip: [" ", "Enter"],
-  success: ["ArrowRight", "2"],
-  fail: ["ArrowLeft", "1"],
-  hide: ["h", "H", "ArrowUp"],
+  easy: ["ArrowRight", "2"],
+  hard: ["ArrowLeft", "1"],
+  learned: ["ArrowUp", "3"],
+  new: ["ArrowDown", "4"],
+  hide: ["h", "H"],
   undo: ["z", "Z"],
 } as const;
 

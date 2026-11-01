@@ -14,7 +14,6 @@ function row(
     termEsp,
     category: "Insurance",
     description: "",
-    status: "new",
     matchKey: matchKey(termEng, termEsp),
     ...overrides,
   };
@@ -45,8 +44,9 @@ describe("buildImportPlan", () => {
     expect(plan.inserts[0]).toMatchObject({
       termEng: "Policy",
       termEsp: "Póliza",
-      status: "new",
+      category: "Insurance",
     });
+    expect(plan.inserts[0]).not.toHaveProperty("status");
     expect(plan.updates).toHaveLength(0);
     expect(plan.preserved).toBe(0);
   });
@@ -122,7 +122,7 @@ describe("buildImportPlan", () => {
 
   it("never touches status, hidden, history or counters", () => {
     const plan = buildImportPlan(
-      [row("Policy", "Póliza", { status: "learned", category: "Changed" })],
+      [row("Policy", "Póliza", { category: "Changed" })],
       [existing("1", "Policy", "Póliza")],
     );
 

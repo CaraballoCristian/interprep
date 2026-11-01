@@ -1,4 +1,3 @@
-import type { CardStatus } from "../types";
 import type { ImportRow } from "./preview";
 
 export type ExistingCard = {
@@ -15,7 +14,6 @@ export type CardInsert = {
   termEsp: string;
   category: string;
   description: string;
-  status: CardStatus;
   matchKey: string;
 };
 
@@ -76,7 +74,6 @@ export function buildImportPlan(
         termEsp: row.termEsp,
         category: row.category,
         description: row.description,
-        status: row.status,
         matchKey: row.matchKey,
       });
       continue;

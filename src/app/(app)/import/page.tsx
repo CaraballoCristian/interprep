@@ -13,7 +13,6 @@ import {
 } from "@lib/import/headers";
 import type { ImportErrorReason } from "@lib/import/preview";
 import type { TranslationKey } from "@lib/i18n/dictionary";
-import type { CardStatus } from "@lib/types";
 import { PageHeading } from "@/components/page-heading";
 import { useI18n } from "@/components/settings-provider";
 
@@ -21,22 +20,14 @@ const FIELD_KEYS: Record<ImportField, TranslationKey> = {
   termEng: "field.termEng",
   termEsp: "field.termEsp",
   category: "field.category",
-  status: "field.status",
   description: "field.description",
 };
 
 const REQUIRED_FIELDS: readonly ImportField[] = ["termEng", "termEsp"];
 
-const STATUS_KEYS: Record<CardStatus, TranslationKey> = {
-  new: "status.new",
-  learning: "status.learning",
-  learned: "status.learned",
-};
-
 const ERROR_KEYS: Record<ImportErrorReason, TranslationKey> = {
   missingTermEng: "import.error.missingTermEng",
   missingTermEsp: "import.error.missingTermEsp",
-  unknownStatus: "import.error.unknownStatus",
 };
 
 const DELIMITER_KEYS: Record<string, TranslationKey> = {
@@ -286,7 +277,7 @@ export default function ImportPage() {
               rows={8}
               spellCheck={false}
               placeholder={
-                "English,Spanish,Category,Status,Description\nPolicy,Póliza,Insurance,new,Contract document"
+                "English,Spanish,Category,Description\nPolicy,Póliza,Insurance,Contract document"
               }
               className="w-full resize-y rounded-xl border border-border bg-background px-3 py-3 font-mono text-sm outline-none focus:border-accent"
             />
@@ -508,9 +499,6 @@ export default function ImportPage() {
                             {t("import.table.category")}
                           </th>
                           <th className="px-2 py-2">
-                            {t("import.table.status")}
-                          </th>
-                          <th className="px-2 py-2">
                             {t("import.table.description")}
                           </th>
                         </tr>
@@ -525,9 +513,6 @@ export default function ImportPage() {
                             <td className="px-2 py-2">{row.termEsp}</td>
                             <td className="px-2 py-2">
                               {row.category || "—"}
-                            </td>
-                            <td className="whitespace-nowrap px-2 py-2">
-                              {t(STATUS_KEYS[row.status])}
                             </td>
                             <td className="max-w-56 truncate px-2 py-2 text-muted">
                               {row.description || "—"}
@@ -562,13 +547,6 @@ export default function ImportPage() {
                         <span className="font-medium">
                           {t(ERROR_KEYS[rowError.reason])}
                         </span>
-                        {rowError.reason === "unknownStatus" &&
-                          rowError.status !== "" && (
-                            <span className="text-muted">
-                              {": "}
-                              {rowError.status}
-                            </span>
-                          )}
                         <span className="mt-0.5 block text-muted">
                           {rowError.termEng || "—"} / {rowError.termEsp || "—"}
                         </span>

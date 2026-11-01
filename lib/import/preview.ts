@@ -1,13 +1,8 @@
 import { matchKey } from "../normalize";
-import type { CardStatus } from "../types";
 import type { ColumnMapping, ImportField } from "./headers";
 import { isBlankRow, type ParsedTable } from "./parse";
-import { normalizeStatus } from "./status";
 
-export type ImportErrorReason =
-  | "missingTermEng"
-  | "missingTermEsp"
-  | "unknownStatus";
+export type ImportErrorReason = "missingTermEng" | "missingTermEsp";
 
 export type ImportRow = {
   line: number;
@@ -15,7 +10,6 @@ export type ImportRow = {
   termEsp: string;
   category: string;
   description: string;
-  status: CardStatus;
   matchKey: string;
 };
 
@@ -24,7 +18,6 @@ export type ImportRowError = {
   reason: ImportErrorReason;
   termEng: string;
   termEsp: string;
-  status: string;
 };
 
 export type ImportCounts = {
@@ -42,7 +35,10 @@ export type ImportPreview = {
 
 /**
  * Interprets the parsed table using a column mapping. Rows with missing
- * required fields or unknown statuses are collected as errors and skipped.
+ * required fields are collected as errors and skipped.
+ *
+ * The spreadsheet status column is deliberately ignored: every new card is
+ * created as NEW and existing cards keep their status.
  */
 export function buildPreview(
   table: ParsedTable,
@@ -73,7 +69,6 @@ export function buildPreview(
     const termEsp = cell(row, "termEsp");
     const category = cell(row, "category");
     const description = cell(row, "description");
-    const rawStatus = cell(row, "status");
 
     if (termEng === "") {
       errors.push({
@@ -81,7 +76,6 @@ export function buildPreview(
         reason: "missingTermEng",
         termEng,
         termEsp,
-        status: rawStatus,
       });
       return;
     }
@@ -92,19 +86,6 @@ export function buildPreview(
         reason: "missingTermEsp",
         termEng,
         termEsp,
-        status: rawStatus,
-      });
-      return;
-    }
-
-    const status = normalizeStatus(rawStatus);
-    if (status === null) {
-      errors.push({
-        line,
-        reason: "unknownStatus",
-        termEng,
-        termEsp,
-        status: rawStatus,
       });
       return;
     }
@@ -115,7 +96,6 @@ export function buildPreview(
       termEsp,
       category,
       description,
-      status,
       matchKey: matchKey(termEng, termEsp),
     });
   });

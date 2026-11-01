@@ -9,6 +9,7 @@ import {
 import {
   CARD_RESULTS,
   CARD_STATUSES,
+  DEFAULT_CARD_STATUSES,
   LANGUAGES,
   SIDE_FIELDS,
   THEMES,
@@ -22,6 +23,7 @@ import {
 export {
   CARD_RESULTS,
   CARD_STATUSES,
+  DEFAULT_CARD_STATUSES,
   LANGUAGES,
   SIDE_FIELDS,
   THEMES,
@@ -79,7 +81,10 @@ export const templates = sqliteTable(
     statuses: text("statuses", { mode: "json" })
       .$type<CardStatus[]>()
       .notNull()
-      .default(sql`'["new","learning","learned"]'`),
+      .default(sql`'["new","easy","hard"]'`),
+    continuous: integer("continuous", { mode: "boolean" })
+      .notNull()
+      .default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

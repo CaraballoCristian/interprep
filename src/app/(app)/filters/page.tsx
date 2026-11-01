@@ -23,7 +23,8 @@ const FIELD_KEYS: Record<SideField, TranslationKey> = {
 
 const STATUS_KEYS: Record<CardStatus, TranslationKey> = {
   new: "status.new",
-  learning: "status.learning",
+  easy: "status.easy",
+  hard: "status.hard",
   learned: "status.learned",
 };
 
@@ -42,6 +43,7 @@ type FiltersView = {
   templates: TemplateView[];
   cardCount: number;
   deckCount: number;
+  sessionActive: boolean;
 };
 
 type Translate = (
@@ -209,6 +211,22 @@ export default function FiltersPage() {
     });
   }
 
+  function selectAllStatuses() {
+    setConfig((current) =>
+      current ? { ...current, statuses: [...CARD_STATUSES] } : current,
+    );
+  }
+
+  function selectNoStatuses() {
+    setConfig((current) => (current ? { ...current, statuses: [] } : current));
+  }
+
+  function toggleContinuous() {
+    setConfig((current) =>
+      current ? { ...current, continuous: !current.continuous } : current,
+    );
+  }
+
   function toggleCategory(category: string) {
     const all = data?.categories ?? [];
 
@@ -250,6 +268,13 @@ export default function FiltersPage() {
 
   function applyConfig() {
     if (!config) {
+      return;
+    }
+
+    if (
+      data?.sessionActive &&
+      !window.confirm(t("filters.confirm.applyWithSession"))
+    ) {
       return;
     }
 
@@ -625,6 +650,25 @@ export default function FiltersPage() {
             {t("filters.statusesTitle")}
           </h2>
 
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={selectAllStatuses}
+              disabled={busy}
+              className="min-h-12 rounded-xl border border-border text-sm font-medium disabled:opacity-50"
+            >
+              {t("filters.all")}
+            </button>
+            <button
+              type="button"
+              onClick={selectNoStatuses}
+              disabled={busy}
+              className="min-h-12 rounded-xl border border-border text-sm font-medium disabled:opacity-50"
+            >
+              {t("filters.none")}
+            </button>
+          </div>
+
           <div className="space-y-1">
             {CARD_STATUSES.map((status) => {
               const checked = config.statuses.includes(status);
@@ -651,6 +695,36 @@ export default function FiltersPage() {
             <p className="text-sm text-muted">{t("filters.statusesEmpty")}</p>
           )}
         </section>
+
+        <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
+          <div>
+            <h2 className="text-lg font-semibold">
+              {t("filters.continuousTitle")}
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              {t("filters.continuousDescription")}
+            </p>
+          </div>
+
+          <label className="flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-xl border border-border bg-background px-3">
+            <span className="text-sm font-medium">
+              {t("filters.continuousLabel")}
+            </span>
+            <input
+              type="checkbox"
+              className="h-5 w-5"
+              checked={config.continuous}
+              disabled={busy}
+              onChange={toggleContinuous}
+            />
+          </label>
+        </section>
+
+        {data.sessionActive && (
+          <p className="rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-sm">
+            {t("filters.sessionActive")}
+          </p>
+        )}
 
         <button
           type="button"
@@ -738,6 +812,14 @@ export default function FiltersPage() {
                     <dd>{categoriesLabel(template.config, t)}</dd>
                     <dt className="text-muted">{t("filters.statuses")}</dt>
                     <dd>{statusesLabel(template.config.statuses, t)}</dd>
+                    {template.config.continuous && (
+                      <>
+                        <dt className="text-muted">
+                          {t("filters.continuousTitle")}
+                        </dt>
+                        <dd>{t("filters.continuousShort")}</dd>
+                      </>
+                    )}
                   </dl>
 
                   <div className="flex flex-wrap gap-2">

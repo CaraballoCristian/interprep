@@ -15,7 +15,8 @@ const validConfig: StudyConfig = {
   sideA: ["termEng"],
   sideB: ["termEsp", "description"],
   categories: ["Insurance", "Court"],
-  statuses: ["new", "learning"],
+  statuses: ["new", "hard"],
+  continuous: false,
 };
 
 describe("sanitizeSide", () => {
@@ -38,13 +39,9 @@ describe("sanitizeSide", () => {
 });
 
 describe("sanitizeStatuses", () => {
-  it("defaults to all statuses when missing", () => {
-    expect(sanitizeStatuses(undefined)).toEqual([
-      "new",
-      "learning",
-      "learned",
-    ]);
-    expect(sanitizeStatuses(null)).toEqual(["new", "learning", "learned"]);
+  it("defaults to NEW/EASY/HARD when missing", () => {
+    expect(sanitizeStatuses(undefined)).toEqual(["new", "easy", "hard"]);
+    expect(sanitizeStatuses(null)).toEqual(["new", "easy", "hard"]);
   });
 
   it("keeps an explicit empty array", () => {
@@ -55,6 +52,11 @@ describe("sanitizeStatuses", () => {
     expect(sanitizeStatuses(["learned", "bogus", "new", "learned"])).toEqual([
       "new",
       "learned",
+    ]);
+    expect(sanitizeStatuses(["hard", "easy", "new"])).toEqual([
+      "new",
+      "easy",
+      "hard",
     ]);
   });
 });
@@ -92,7 +94,8 @@ describe("normalizeConfig", () => {
       sideA: ["termEng"],
       sideB: ["termEsp"],
       categories: null,
-      statuses: ["new", "learning", "learned"],
+      statuses: ["new", "easy", "hard"],
+      continuous: false,
     });
   });
 
@@ -101,8 +104,18 @@ describe("normalizeConfig", () => {
       sideA: [],
       sideB: [],
       categories: null,
-      statuses: ["new", "learning", "learned"],
+      statuses: ["new", "easy", "hard"],
+      continuous: false,
     });
+  });
+
+  it("keeps continuous only when explicitly true", () => {
+    expect(
+      normalizeConfig({ ...validConfig, continuous: true }).continuous,
+    ).toBe(true);
+    expect(
+      normalizeConfig({ ...validConfig, continuous: "yes" }).continuous,
+    ).toBe(false);
   });
 });
 
@@ -111,14 +124,14 @@ describe("validateConfig", () => {
     const result = validateConfig({
       ...validConfig,
       sideA: ["termEng", "termEng"],
-      statuses: ["learning", "new"],
+      statuses: ["hard", "new"],
     });
 
     expect(result).toEqual({
       ok: true,
       config: {
         ...validConfig,
-        statuses: ["new", "learning"],
+        statuses: ["new", "hard"],
       },
     });
   });
