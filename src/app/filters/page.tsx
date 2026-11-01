@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { TranslationKey } from "@lib/i18n/dictionary";
+import { toggleSideField } from "@lib/study/config";
 import type { StudyConfig } from "@lib/study/types";
 import {
   CARD_STATUSES,
@@ -188,17 +189,7 @@ export default function FiltersPage() {
         return current;
       }
 
-      const other = side === "sideA" ? "sideB" : "sideA";
-      if (current[other].includes(field)) {
-        return current;
-      }
-
-      const selected = current[side].includes(field);
-      const next = selected
-        ? current[side].filter((item) => item !== field)
-        : [...current[side], field];
-
-      return { ...current, [side]: next };
+      return toggleSideField(current, side, field);
     });
   }
 
@@ -510,13 +501,13 @@ export default function FiltersPage() {
                       inA
                         ? "border-accent bg-accent/10"
                         : "border-border bg-background"
-                    } ${inB ? "opacity-40" : "cursor-pointer"}`}
+                    } ${busy ? "opacity-60" : "cursor-pointer"}`}
                   >
                     <input
                       type="checkbox"
                       className="h-5 w-5"
                       checked={inA}
-                      disabled={busy || inB}
+                      disabled={busy}
                       aria-label={t("filters.sideLabelA", {
                         field: fieldLabel,
                       })}
@@ -532,13 +523,13 @@ export default function FiltersPage() {
                       inB
                         ? "border-accent bg-accent/10"
                         : "border-border bg-background"
-                    } ${inA ? "opacity-40" : "cursor-pointer"}`}
+                    } ${busy ? "opacity-60" : "cursor-pointer"}`}
                   >
                     <input
                       type="checkbox"
                       className="h-5 w-5"
                       checked={inB}
-                      disabled={busy || inA}
+                      disabled={busy}
                       aria-label={t("filters.sideLabelB", {
                         field: fieldLabel,
                       })}
