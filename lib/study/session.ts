@@ -19,11 +19,6 @@ export type StudySession = {
   updatedAt: string;
 };
 
-export type ReviewOption = {
-  status: CardStatus;
-  count: number;
-};
-
 /** Payload consumed by the study screen. */
 export type StudyView = {
   config: StudyConfig;
@@ -34,7 +29,6 @@ export type StudyView = {
   progress: { seen: number; total: number; answered: number };
   metrics: RoundSummary;
   summary: RoundSummary | null;
-  reviewOptions: ReviewOption[];
   undoAvailable: boolean;
   undoCount: number;
   resumePending: boolean;

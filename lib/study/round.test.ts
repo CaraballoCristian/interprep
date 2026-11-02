@@ -87,7 +87,7 @@ describe("recordStatus", () => {
 
   it("ignores statuses for cards that are not current", () => {
     const round = createRound([card("a"), card("b")], "standard", fixedRandom(0.5));
-    const [first, second] = round.deck;
+    const second = round.deck[1];
 
     expect(
       recordStatus(round, second, "easy", { selectedStatuses: ALL_SELECTED }),

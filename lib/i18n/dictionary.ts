@@ -7,12 +7,9 @@ import type { Language } from "../types";
 const es = {
   "common.appName": "Interprep",
   "nav.main": "Navegación principal",
-  "common.home": "Inicio",
   "common.study": "Estudiar",
   "common.cancel": "Cancelar",
   "common.save": "Guardar",
-  "common.backHome": "Volver al inicio",
-  "common.loading": "Cargando…",
 
   "status.new": "Nueva",
   "status.easy": "Fácil",
@@ -24,21 +21,12 @@ const es = {
   "field.category": "Categoría",
   "field.description": "Descripción",
   "field.status": "Estado",
-  "field.sideA": "Lado A",
-  "field.sideB": "Lado B",
 
   "settings.language": "Idioma",
-  "settings.theme": "Tema",
   "settings.toLight": "Cambiar a tema claro",
   "settings.toDark": "Cambiar a tema oscuro",
   "settings.saveError": "No se pudo guardar la preferencia.",
 
-  "home.title": "Entrenador de terminología para intérpretes",
-  "home.tagline":
-    "Modo Repetición Intensivo. Empezá importando tu planilla de terminología.",
-  "home.startTitle": "Empezar",
-  "home.startDescription":
-    "Cargá tu planilla de terminología para armar el mazo.",
   "nav.import": "Importar",
   "nav.filters": "Filtros",
   "nav.library": "Biblioteca",
@@ -70,7 +58,6 @@ const es = {
   "import.duplicates":
     "Se ignoraron {count} filas duplicadas (se usó la última aparición de cada término).",
   "import.importAnother": "Importar otro archivo",
-  "import.backHome": "Volver al inicio",
   "import.columns": "Columnas",
   "import.headerRow": "Fila de encabezados",
   "import.headerRowHint":
@@ -124,9 +111,7 @@ const es = {
     "Importá tarjetas o cambiá los filtros para armar el mazo.",
   "study.goLibrary": "Ir a la biblioteca",
   "study.changeFilters": "Cambiar filtros",
-  "study.fail": "Difícil",
   "study.hide": "Ocultar",
-  "study.success": "Fácil",
   "study.flip": "Girar",
   "study.hintFlipped": "Usá las flechas o deslizá la tarjeta",
   "study.hintUnflipped": "Tocá la tarjeta para ver la respuesta",
@@ -157,18 +142,12 @@ const es = {
   "summary.successes": "Aciertos",
   "summary.failures": "Fallos",
   "summary.accuracy": "% de acierto",
-  "summary.new": "Nuevas",
-  "summary.easy": "Fáciles",
-  "summary.hard": "Difíciles",
-  "summary.learned": "Aprendidas",
   "summary.reviewTitle": "Repasar",
   "summary.reviewDescription":
     "Elegí qué estados querés repasar de esta vuelta.",
   "summary.start": "Empezar",
   "summary.finish": "Terminar",
   "summary.newRound": "Nueva vuelta",
-  "summary.changeFilters": "Cambiar template / filtros",
-  "summary.undo": "Deshacer la última acción",
 
   "filters.title": "Filtros y templates",
   "filters.loading": "Cargando filtros…",
@@ -315,12 +294,9 @@ export type TranslationKey = keyof typeof es;
 const en: Record<TranslationKey, string> = {
   "common.appName": "Interprep",
   "nav.main": "Main navigation",
-  "common.home": "Home",
   "common.study": "Study",
   "common.cancel": "Cancel",
   "common.save": "Save",
-  "common.backHome": "Back to home",
-  "common.loading": "Loading…",
 
   "status.new": "New",
   "status.easy": "Easy",
@@ -332,21 +308,12 @@ const en: Record<TranslationKey, string> = {
   "field.category": "Category",
   "field.description": "Description",
   "field.status": "Status",
-  "field.sideA": "Side A",
-  "field.sideB": "Side B",
 
   "settings.language": "Language",
-  "settings.theme": "Theme",
   "settings.toLight": "Switch to light theme",
   "settings.toDark": "Switch to dark theme",
   "settings.saveError": "The preference could not be saved.",
 
-  "home.title": "Interpreter terminology trainer",
-  "home.tagline":
-    "Intensive Repetition Mode. Start by importing your terminology spreadsheet.",
-  "home.startTitle": "Get started",
-  "home.startDescription":
-    "Load your terminology spreadsheet to build the deck.",
   "nav.import": "Import",
   "nav.filters": "Filters",
   "nav.library": "Library",
@@ -378,7 +345,6 @@ const en: Record<TranslationKey, string> = {
   "import.duplicates":
     "{count} duplicate rows were ignored (the last occurrence of each term was used).",
   "import.importAnother": "Import another file",
-  "import.backHome": "Back to home",
   "import.columns": "Columns",
   "import.headerRow": "Header row",
   "import.headerRowHint":
@@ -432,9 +398,7 @@ const en: Record<TranslationKey, string> = {
     "Import cards or change the filters to build the deck.",
   "study.goLibrary": "Go to the library",
   "study.changeFilters": "Change filters",
-  "study.fail": "Hard",
   "study.hide": "Hide",
-  "study.success": "Easy",
   "study.flip": "Flip",
   "study.hintFlipped": "Use the arrows or swipe the card",
   "study.hintUnflipped": "Tap the card to reveal the answer",
@@ -465,18 +429,12 @@ const en: Record<TranslationKey, string> = {
   "summary.successes": "Hits",
   "summary.failures": "Misses",
   "summary.accuracy": "% accuracy",
-  "summary.new": "New",
-  "summary.easy": "Easy",
-  "summary.hard": "Hard",
-  "summary.learned": "Learned",
   "summary.reviewTitle": "Review",
   "summary.reviewDescription":
     "Choose which statuses you want to review from this round.",
   "summary.start": "Start",
   "summary.finish": "Finish",
   "summary.newRound": "New round",
-  "summary.changeFilters": "Change template / filters",
-  "summary.undo": "Undo the last action",
 
   "filters.title": "Filters & templates",
   "filters.loading": "Loading filters…",

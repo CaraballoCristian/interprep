@@ -1,7 +1,6 @@
 import { buildDeck } from "@lib/study/deck";
 import { applyResultToCard } from "@lib/study/history";
 import {
-  cloneRound,
   createReviewRound,
   createRound,
   currentCardId,
@@ -14,7 +13,6 @@ import {
   type RoundState,
 } from "@lib/study/round";
 import type {
-  ReviewOption,
   StudyAction,
   StudySession,
   StudyView,
@@ -26,7 +24,7 @@ import {
   undoAvailable,
 } from "@lib/study/undo";
 import { normalizeConfig } from "@lib/templates/validation";
-import { DEFAULT_CARD_STATUSES, type CardStatus } from "@lib/types";
+import { DEFAULT_CARD_STATUSES } from "@lib/types";
 import {
   getStudyCard,
   listStudyCards,
@@ -35,7 +33,6 @@ import {
   updateCardStudyFields,
 } from "@/db/repositories/cards";
 import {
-  clearStudySession,
   loadStudySession,
   saveStudySession,
 } from "@/db/repositories/session";
@@ -66,8 +63,6 @@ const DEFAULT_CONFIG: StudyConfig = {
   statuses: [...DEFAULT_CARD_STATUSES],
   continuous: false,
 };
-
-const REVIEW_STATUSES: readonly CardStatus[] = ["new", "easy", "hard"];
 
 function modeFor(config: StudyConfig): RoundMode {
   return config.continuous ? "continuous" : "standard";
@@ -202,20 +197,12 @@ function markResumePending(session: StudySession): void {
   session.resumePending = session.round.answered > 0;
 }
 
-function reviewOptions(round: RoundState): ReviewOption[] {
-  return REVIEW_STATUSES.map((status) => ({
-    status,
-    count: round.deck.filter((id) => round.resolved[id] === status).length,
-  }));
-}
-
 type BuildViewOptions = {
   suppressResumePrompt?: boolean;
 };
 
 function buildView(
   session: StudySession,
-  now: number,
   options: BuildViewOptions = {},
 ): StudyView {
   const cards = listStudyCards();
@@ -242,7 +229,6 @@ function buildView(
     },
     metrics,
     summary,
-    reviewOptions: reviewOptions(round),
     undoAvailable: undoAvailable(session.undoStack),
     undoCount: session.undoStack.length,
     resumePending:
@@ -261,9 +247,9 @@ function currentCardOrThrow(session: StudySession): StudyCard {
 }
 
 /** Returns the current view of the study session. */
-export function getStudyView(now = Date.now()): StudyView {
+export function getStudyView(): StudyView {
   const session = ensureSession();
-  return buildView(session, now);
+  return buildView(session);
 }
 
 /** Applies a study action, persists the session and returns the new view. */
@@ -279,7 +265,7 @@ export function applyStudyAction(
       session.flipped = action.flipped;
       markResumePending(session);
       persist(session);
-      return buildView(session, now, { suppressResumePrompt: true });
+      return buildView(session, { suppressResumePrompt: true });
     }
 
     case "status": {
@@ -290,13 +276,7 @@ export function applyStudyAction(
       const card = currentCardOrThrow(session);
       session.undoStack = pushUndo(
         session.undoStack,
-        createSessionUndo(
-          "status",
-          card,
-          cloneRound(session.round),
-          session.flipped,
-          now,
-        ),
+        createSessionUndo("status", card, session.round, session.flipped, now),
       );
 
       const withResult =
@@ -320,20 +300,14 @@ export function applyStudyAction(
       session.flipped = false;
       markResumePending(session);
       persist(session);
-      return buildView(session, now, { suppressResumePrompt: true });
+      return buildView(session, { suppressResumePrompt: true });
     }
 
     case "hide": {
       const card = currentCardOrThrow(session);
       session.undoStack = pushUndo(
         session.undoStack,
-        createSessionUndo(
-          "hide",
-          card,
-          cloneRound(session.round),
-          session.flipped,
-          now,
-        ),
+        createSessionUndo("hide", card, session.round, session.flipped, now),
       );
 
       updateCardHidden(card.id, true);
@@ -341,7 +315,7 @@ export function applyStudyAction(
       session.flipped = false;
       markResumePending(session);
       persist(session);
-      return buildView(session, now, { suppressResumePrompt: true });
+      return buildView(session, { suppressResumePrompt: true });
     }
 
     case "undo": {
@@ -352,7 +326,7 @@ export function applyStudyAction(
 
       restoreCardFields(undo.entry.cardId, undo.entry.snapshot);
       session.round = repairRound(
-        cloneRound(undo.round),
+        undo.round,
         listStudyCards(),
         session.config,
       );
@@ -360,7 +334,7 @@ export function applyStudyAction(
       session.undoStack = session.undoStack.slice(0, -1);
       markResumePending(session);
       persist(session);
-      return buildView(session, now, { suppressResumePrompt: true });
+      return buildView(session, { suppressResumePrompt: true });
     }
 
     case "new-round": {
@@ -374,7 +348,7 @@ export function applyStudyAction(
       session.undoStack = [];
       markResumePending(session);
       persist(session);
-      return buildView(session, now, { suppressResumePrompt: true });
+      return buildView(session, { suppressResumePrompt: true });
     }
 
     case "review": {
@@ -395,13 +369,13 @@ export function applyStudyAction(
       session.undoStack = [];
       markResumePending(session);
       persist(session);
-      return buildView(session, now, { suppressResumePrompt: true });
+      return buildView(session, { suppressResumePrompt: true });
     }
 
     case "resume": {
       session.resumePending = false;
       persist(session);
-      return buildView(session, now);
+      return buildView(session);
     }
 
     case "reset": {
@@ -413,11 +387,10 @@ export function applyStudyAction(
       );
       fresh.createdAt = session.createdAt;
       persist(fresh);
-      return buildView(fresh, now);
+      return buildView(fresh);
     }
 
     case "finish": {
-      clearStudySession();
       const fresh = freshSession(
         session.config,
         session.templateId,
@@ -425,13 +398,13 @@ export function applyStudyAction(
         random,
       );
       persist(fresh);
-      return buildView(fresh, now, { suppressResumePrompt: true });
+      return buildView(fresh, { suppressResumePrompt: true });
     }
 
     case "leave": {
       markResumePending(session);
       persist(session);
-      return buildView(session, now, { suppressResumePrompt: true });
+      return buildView(session, { suppressResumePrompt: true });
     }
   }
 }
@@ -444,7 +417,6 @@ export function applyStudyAction(
 export function applyStudyConfig(
   config: StudyConfig,
   templateId: string | null = null,
-  now = Date.now(),
 ): StudyView {
   const session = ensureSession();
   const cards = listStudyCards();
@@ -452,7 +424,7 @@ export function applyStudyConfig(
   fresh.createdAt = session.createdAt;
 
   persist(fresh);
-  return buildView(fresh, now, { suppressResumePrompt: true });
+  return buildView(fresh, { suppressResumePrompt: true });
 }
 
 /**

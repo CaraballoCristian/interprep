@@ -46,10 +46,3 @@ export function saveStudySession(session: StudySession): void {
     })
     .run();
 }
-
-export function clearStudySession(): void {
-  getDb()
-    .delete(sessionState)
-    .where(eq(sessionState.id, "default"))
-    .run();
-}
