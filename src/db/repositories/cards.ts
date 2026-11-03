@@ -18,15 +18,26 @@ const INSERT_CHUNK_SIZE = 200;
  * `null`/undefined counts every deck. An empty array means no decks and
  * therefore zero cards.
  */
-export function countCards(deckIds?: readonly string[] | null): number {
+export function countCards(
+  userId: string,
+  deckIds?: readonly string[] | null,
+): number {
   if (deckIds && deckIds.length === 0) {
     return 0;
   }
 
-  const query = getDb().select({ count: sql<number>`count(*)` }).from(cards);
-  const row = deckIds
-    ? query.where(inArray(cards.deckId, [...deckIds])).get()
-    : query.get();
+  const query = getDb()
+    .select({ count: sql<number>`count(*)` })
+    .from(cards)
+    .where(
+      deckIds
+        ? and(
+            eq(cards.userId, userId),
+            inArray(cards.deckId, [...deckIds]),
+          )
+        : eq(cards.userId, userId),
+    );
+  const row = query.get();
   return row?.count ?? 0;
 }
 
@@ -35,18 +46,25 @@ export function countCards(deckIds?: readonly string[] | null): number {
  * UI. The empty string is kept: imported cards without a category use it.
  */
 export function listCategories(
+  userId: string,
   deckIds?: readonly string[] | null,
 ): string[] {
   if (deckIds && deckIds.length === 0) {
     return [];
   }
 
-  const query = getDb()
+  const rows = getDb()
     .selectDistinct({ category: cards.category })
-    .from(cards);
-  const rows = deckIds
-    ? query.where(inArray(cards.deckId, [...deckIds])).all()
-    : query.all();
+    .from(cards)
+    .where(
+      deckIds
+        ? and(
+            eq(cards.userId, userId),
+            inArray(cards.deckId, [...deckIds]),
+          )
+        : eq(cards.userId, userId),
+    )
+    .all();
 
   return rows
     .map((row) => row.category)
@@ -54,7 +72,10 @@ export function listCategories(
 }
 
 /** Lightweight projection used by the importer to match existing cards. */
-export function listCardsForMatching(deckId: string): ExistingCard[] {
+export function listCardsForMatching(
+  userId: string,
+  deckId: string,
+): ExistingCard[] {
   return getDb()
     .select({
       id: cards.id,
@@ -65,7 +86,7 @@ export function listCardsForMatching(deckId: string): ExistingCard[] {
       description: cards.description,
     })
     .from(cards)
-    .where(eq(cards.deckId, deckId))
+    .where(and(eq(cards.userId, userId), eq(cards.deckId, deckId)))
     .all();
 }
 
@@ -79,6 +100,7 @@ export type ApplyImportResult = {
  * values; existing cards keep status, hidden flag, history and counters.
  */
 export function applyImportPlan(
+  userId: string,
   plan: {
     inserts: readonly CardInsert[];
     updates: readonly CardUpdate[];
@@ -94,6 +116,7 @@ export function applyImportPlan(
         .slice(i, i + INSERT_CHUNK_SIZE)
         .map((card) => ({
           id: crypto.randomUUID(),
+          userId,
           deckId,
           category: card.category,
           termEng: card.termEng,
@@ -121,7 +144,7 @@ export function applyImportPlan(
           description: update.description,
           updatedAt: now,
         })
-        .where(eq(cards.id, update.id))
+        .where(and(eq(cards.userId, userId), eq(cards.id, update.id)))
         .run();
     }
   });
@@ -143,20 +166,28 @@ const studyCardColumns = {
   totalFail: cards.totalFail,
 };
 
-export function listStudyCards(): StudyCard[] {
-  return getDb().select(studyCardColumns).from(cards).all();
+export function listStudyCards(userId: string): StudyCard[] {
+  return getDb()
+    .select(studyCardColumns)
+    .from(cards)
+    .where(eq(cards.userId, userId))
+    .all();
 }
 
-export function getStudyCard(id: string): StudyCard | null {
+export function getStudyCard(
+  userId: string,
+  id: string,
+): StudyCard | null {
   const row = getDb()
     .select(studyCardColumns)
     .from(cards)
-    .where(eq(cards.id, id))
+    .where(and(eq(cards.userId, userId), eq(cards.id, id)))
     .get();
   return row ?? null;
 }
 
 export function updateCardResult(
+  userId: string,
   id: string,
   result: {
     history: CardResult[];
@@ -172,20 +203,25 @@ export function updateCardResult(
       totalFail: result.totalFail,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(cards.id, id))
+    .where(and(eq(cards.userId, userId), eq(cards.id, id)))
     .run();
 }
 
-export function updateCardStatus(id: string, status: CardStatus): void {
+export function updateCardStatus(
+  userId: string,
+  id: string,
+  status: CardStatus,
+): void {
   getDb()
     .update(cards)
     .set({ status, updatedAt: new Date().toISOString() })
-    .where(eq(cards.id, id))
+    .where(and(eq(cards.userId, userId), eq(cards.id, id)))
     .run();
 }
 
 /** Updates the study-related fields of a card in a single write. */
 export function updateCardStudyFields(
+  userId: string,
   id: string,
   input: {
     status: CardStatus;
@@ -203,20 +239,25 @@ export function updateCardStudyFields(
       totalFail: input.totalFail,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(cards.id, id))
+    .where(and(eq(cards.userId, userId), eq(cards.id, id)))
     .run();
 }
 
-export function updateCardHidden(id: string, hidden: boolean): void {
+export function updateCardHidden(
+  userId: string,
+  id: string,
+  hidden: boolean,
+): void {
   getDb()
     .update(cards)
     .set({ hidden, updatedAt: new Date().toISOString() })
-    .where(eq(cards.id, id))
+    .where(and(eq(cards.userId, userId), eq(cards.id, id)))
     .run();
 }
 
 /** Restores the fields captured by an undo snapshot. */
 export function restoreCardFields(
+  userId: string,
   id: string,
   snapshot: CardSnapshot,
 ): void {
@@ -230,7 +271,7 @@ export function restoreCardFields(
       hidden: snapshot.hidden,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(cards.id, id))
+    .where(and(eq(cards.userId, userId), eq(cards.id, id)))
     .run();
 }
 
@@ -251,15 +292,22 @@ const libraryCardColumns = {
 };
 
 /** Every card, including hidden ones. Filtering happens in the pure domain. */
-export function listLibraryCards(): LibraryCard[] {
-  return getDb().select(libraryCardColumns).from(cards).all();
+export function listLibraryCards(userId: string): LibraryCard[] {
+  return getDb()
+    .select(libraryCardColumns)
+    .from(cards)
+    .where(eq(cards.userId, userId))
+    .all();
 }
 
-export function getCardById(id: string): LibraryCard | null {
+export function getCardById(
+  userId: string,
+  id: string,
+): LibraryCard | null {
   const row = getDb()
     .select(libraryCardColumns)
     .from(cards)
-    .where(eq(cards.id, id))
+    .where(and(eq(cards.userId, userId), eq(cards.id, id)))
     .get();
   return row ?? null;
 }
@@ -269,17 +317,23 @@ export function getCardById(id: string): LibraryCard | null {
  * lets an edit keep its own key without colliding with itself.
  */
 export function findCardByMatchKey(
+  userId: string,
   deckId: string,
   key: string,
   excludeId?: string,
 ): { id: string } | null {
   const where = excludeId
     ? and(
+        eq(cards.userId, userId),
         eq(cards.deckId, deckId),
         eq(cards.matchKey, key),
         ne(cards.id, excludeId),
       )
-    : and(eq(cards.deckId, deckId), eq(cards.matchKey, key));
+    : and(
+        eq(cards.userId, userId),
+        eq(cards.deckId, deckId),
+        eq(cards.matchKey, key),
+      );
 
   const row = getDb()
     .select({ id: cards.id })
@@ -300,13 +354,17 @@ export type LibraryCardInput = {
 };
 
 /** Creates a card with empty history/counters and returns the stored row. */
-export function createCard(input: LibraryCardInput): LibraryCard {
+export function createCard(
+  userId: string,
+  input: LibraryCardInput,
+): LibraryCard {
   const now = new Date().toISOString();
 
   return getDb()
     .insert(cards)
     .values({
       id: crypto.randomUUID(),
+      userId,
       deckId: input.deckId,
       category: input.category,
       termEng: input.termEng,
@@ -327,6 +385,7 @@ export function createCard(input: LibraryCardInput): LibraryCard {
 
 /** Updates editable content and recomputes the matching key. */
 export function updateCard(
+  userId: string,
   id: string,
   input: LibraryCardInput,
 ): LibraryCard | null {
@@ -342,7 +401,7 @@ export function updateCard(
       matchKey: buildMatchKey(input.termEng, input.termEsp),
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(cards.id, id))
+    .where(and(eq(cards.userId, userId), eq(cards.id, id)))
     .returning(libraryCardColumns)
     .get();
 
@@ -350,7 +409,10 @@ export function updateCard(
 }
 
 /** Returns false when the card did not exist. */
-export function deleteCard(id: string): boolean {
-  const result = getDb().delete(cards).where(eq(cards.id, id)).run();
+export function deleteCard(userId: string, id: string): boolean {
+  const result = getDb()
+    .delete(cards)
+    .where(and(eq(cards.userId, userId), eq(cards.id, id)))
+    .run();
   return result.changes > 0;
 }

@@ -1,53 +1,23 @@
 import { eq, sql } from "drizzle-orm";
-import { DEFAULT_DECK_NAME } from "@lib/decks/types";
 import { getDb } from "./client";
 import { runMigrations } from "./migrate";
-import { findSettings } from "./repositories/settings";
 import {
   CARD_STATUSES,
   DEFAULT_CARD_STATUSES,
   cards,
-  decks,
-  settings,
   templates,
   type CardStatus,
 } from "./schema";
 
-const DEFAULT_TEMPLATE_NAME = "Eng → Esp";
-
 /**
- * Applies pending migrations, migrates the old dynamic statuses and seeds the
- * first-run defaults. Safe to call on every server start: every step is
- * idempotent and seeding only happens once.
+ * Applies pending migrations and migrates the old dynamic statuses. Safe to
+ * call on every server start: every step is idempotent. Per-user workspaces
+ * are seeded lazily by `ensureUserWorkspace` on the first authenticated
+ * request, because there is no user before login.
  */
 export function bootstrapDatabase(): void {
   runMigrations();
   migrateLegacyStatuses();
-  seedDefaultDeck();
-  seedFirstRun();
-}
-
-/**
- * The app always needs at least one deck. Migrations seed "General" for
- * existing databases; this covers a database whose decks were all removed by
- * an older build.
- */
-function seedDefaultDeck(): void {
-  const db = getDb();
-  const existing = db.select().from(decks).limit(1).all();
-  if (existing.length > 0) {
-    return;
-  }
-
-  const now = new Date().toISOString();
-  db.insert(decks)
-    .values({
-      id: crypto.randomUUID(),
-      name: DEFAULT_DECK_NAME,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
 }
 
 function isCardStatus(value: unknown): value is CardStatus {
@@ -114,54 +84,4 @@ function migrateLegacyStatuses(): void {
         .run();
     }
   }
-}
-
-function seedFirstRun(): void {
-  const db = getDb();
-
-  const existingSettings = db.select().from(settings).limit(1).all();
-  if (existingSettings.length > 0) {
-    return;
-  }
-
-  db.transaction((tx) => {
-    const templateId = crypto.randomUUID();
-
-    tx.insert(templates)
-      .values({
-        id: templateId,
-        name: DEFAULT_TEMPLATE_NAME,
-        sideA: ["termEng"],
-        sideB: ["termEsp", "description"],
-        categories: null,
-        statuses: [...DEFAULT_CARD_STATUSES],
-        continuous: false,
-      })
-      .run();
-
-    tx.insert(settings)
-      .values({
-        id: "default",
-        theme: "dark",
-        language: "es",
-        lastTemplateId: templateId,
-      })
-      .run();
-  });
-}
-
-/** Returns the single settings row, creating it if it somehow went missing. */
-export function getSettings() {
-  const existing = findSettings();
-  if (existing) {
-    return existing;
-  }
-
-  seedFirstRun();
-
-  const seeded = findSettings();
-  if (!seeded) {
-    throw new Error("settings row could not be created");
-  }
-  return seeded;
 }

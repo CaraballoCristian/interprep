@@ -84,22 +84,28 @@ function configFromTemplate(template: Template): StudyConfig {
   });
 }
 
-function toTemplateView(template: Template): TemplateView {
+function toTemplateView(
+  userId: string,
+  template: Template,
+): TemplateView {
   return {
     id: template.id,
     name: template.name,
-    config: pruneConfigDecks(configFromTemplate(template)),
+    config: pruneConfigDecks(userId, configFromTemplate(template)),
     createdAt: template.createdAt,
     updatedAt: template.updatedAt,
   };
 }
 
-function requireConfig(value: unknown): StudyConfig {
+function requireConfig(
+  userId: string,
+  value: unknown,
+): StudyConfig {
   const result = validateConfig(value);
   if (!result.ok) {
     throw new TemplateError("invalid_config");
   }
-  return pruneConfigDecks(result.config);
+  return pruneConfigDecks(userId, result.config);
 }
 
 function requireName(value: unknown): string {
@@ -110,17 +116,19 @@ function requireName(value: unknown): string {
   return result.name;
 }
 
-export function listTemplateViews(): TemplateView[] {
-  return listTemplates().map(toTemplateView);
+export function listTemplateViews(userId: string): TemplateView[] {
+  return listTemplates(userId).map((template) =>
+    toTemplateView(userId, template),
+  );
 }
 
 /** Everything the filters screen needs: current session config and options. */
-export function getFiltersView(): FiltersView {
-  const view = getStudyView();
-  const cards = listStudyCards();
-  const decks = listDeckSummaries();
-  const config = pruneConfigDecks(view.config);
-  const categoriesByDeck = listCategoriesByDeck();
+export function getFiltersView(userId: string): FiltersView {
+  const view = getStudyView(userId);
+  const cards = listStudyCards(userId);
+  const decks = listDeckSummaries(userId);
+  const config = pruneConfigDecks(userId, view.config);
+  const categoriesByDeck = listCategoriesByDeck(userId);
   const allDeckIds = decks.map((deck) => deck.id);
 
   return {
@@ -133,26 +141,32 @@ export function getFiltersView(): FiltersView {
     ),
     categoriesByDeck,
     decks,
-    templates: listTemplateViews(),
-    cardCount: countCards(),
+    templates: listTemplateViews(userId),
+    cardCount: countCards(userId),
     deckCount: buildDeck(cards, config).length,
     sessionActive: view.progress.answered > 0,
   };
 }
 
 /** Saves the given config under a new name. Does not apply it. */
-export function saveTemplate(input: {
-  name: unknown;
-  config: unknown;
-}): TemplateView {
+export function saveTemplate(
+  userId: string,
+  input: {
+    name: unknown;
+    config: unknown;
+  },
+): TemplateView {
   const name = requireName(input.name);
-  const config = requireConfig(input.config);
+  const config = requireConfig(userId, input.config);
 
-  if (findTemplateByName(name)) {
+  if (findTemplateByName(userId, name)) {
     throw new TemplateError("duplicate_name");
   }
 
-  return toTemplateView(createTemplate({ name, ...config }));
+  return toTemplateView(
+    userId,
+    createTemplate(userId, { name, ...config }),
+  );
 }
 
 /**
@@ -160,10 +174,11 @@ export function saveTemplate(input: {
  * config to the running session.
  */
 export function updateTemplateConfig(
+  userId: string,
   id: string,
   input: { name?: unknown; config?: unknown },
 ): TemplateView {
-  if (!getTemplateById(id)) {
+  if (!getTemplateById(userId, id)) {
     throw new TemplateError("not_found");
   }
 
@@ -171,49 +186,52 @@ export function updateTemplateConfig(
 
   if ("name" in input) {
     const name = requireName(input.name);
-    if (findTemplateByName(name, id)) {
+    if (findTemplateByName(userId, name, id)) {
       throw new TemplateError("duplicate_name");
     }
     patch.name = name;
   }
 
   if ("config" in input) {
-    Object.assign(patch, requireConfig(input.config));
+    Object.assign(patch, requireConfig(userId, input.config));
   }
 
   if (Object.keys(patch).length === 0) {
     throw new TemplateError("empty_update");
   }
 
-  const updated = updateTemplate(id, patch);
+  const updated = updateTemplate(userId, id, patch);
   if (!updated) {
     throw new TemplateError("not_found");
   }
 
-  return toTemplateView(updated);
+  return toTemplateView(userId, updated);
 }
 
 /** Deletes a template and detaches it from the session if it was applied. */
-export function removeTemplate(id: string): void {
-  if (!getTemplateById(id)) {
+export function removeTemplate(userId: string, id: string): void {
+  if (!getTemplateById(userId, id)) {
     throw new TemplateError("not_found");
   }
 
-  deleteTemplate(id);
-  detachSessionTemplate(id);
+  deleteTemplate(userId, id);
+  detachSessionTemplate(userId, id);
 }
 
 /**
  * Applies a template: replaces the session config, starts a new round and
  * remembers the template as the last one used.
  */
-export function applyTemplateToSession(id: string): StudyView {
-  const template = getTemplateById(id);
+export function applyTemplateToSession(
+  userId: string,
+  id: string,
+): StudyView {
+  const template = getTemplateById(userId, id);
   if (!template) {
     throw new TemplateError("not_found");
   }
 
-  const config = requireConfig({
+  const config = requireConfig(userId, {
     sideA: template.sideA,
     sideB: template.sideB,
     categories: template.categories,
@@ -222,7 +240,7 @@ export function applyTemplateToSession(id: string): StudyView {
     continuous: template.continuous,
   });
 
-  const view = applyStudyConfig(config, template.id);
-  setLastTemplateId(template.id);
+  const view = applyStudyConfig(userId, config, template.id);
+  setLastTemplateId(userId, template.id);
   return view;
 }

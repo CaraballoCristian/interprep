@@ -3,11 +3,11 @@ import type { Language, Theme } from "@lib/types";
 import { getDb } from "../client";
 import { settings, type Settings } from "../schema";
 
-export function findSettings(): Settings | null {
+export function findSettings(userId: string): Settings | null {
   const row = getDb()
     .select()
     .from(settings)
-    .where(eq(settings.id, "default"))
+    .where(eq(settings.userId, userId))
     .get();
   return row ?? null;
 }
@@ -16,12 +16,20 @@ export function findSettings(): Settings | null {
  * Sets the last applied template. Creates the settings row if it is missing,
  * so this never silently does nothing.
  */
-export function setLastTemplateId(templateId: string | null): void {
+export function setLastTemplateId(
+  userId: string,
+  templateId: string | null,
+): void {
   const now = new Date().toISOString();
 
   getDb()
     .insert(settings)
-    .values({ id: "default", lastTemplateId: templateId, updatedAt: now })
+    .values({
+      id: userId,
+      userId,
+      lastTemplateId: templateId,
+      updatedAt: now,
+    })
     .onConflictDoUpdate({
       target: settings.id,
       set: { lastTemplateId: templateId, updatedAt: now },
@@ -30,16 +38,20 @@ export function setLastTemplateId(templateId: string | null): void {
 }
 
 /** Partial update of the user preferences. Unknown fields are never written. */
-export function updateSettings(input: {
-  theme?: Theme;
-  language?: Language;
-}): Settings {
+export function updateSettings(
+  userId: string,
+  input: {
+    theme?: Theme;
+    language?: Language;
+  },
+): Settings {
   const now = new Date().toISOString();
 
   return getDb()
     .insert(settings)
     .values({
-      id: "default",
+      id: userId,
+      userId,
       ...(input.theme ? { theme: input.theme } : {}),
       ...(input.language ? { language: input.language } : {}),
       updatedAt: now,

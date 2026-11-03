@@ -25,7 +25,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/drizzle ./drizzle
 
-RUN mkdir -p /app/data
+# Never ship a database from the build context. The real file is created at
+# runtime (or mounted as a volume) under /app/data.
+RUN rm -rf /app/data && mkdir -p /app/data
 
 EXPOSE 3000
 CMD ["node", "server.js"]

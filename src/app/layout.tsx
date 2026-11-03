@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { SettingsProvider } from "@/components/settings-provider";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
-import { getSettings } from "@/db/bootstrap";
+import { DEFAULT_SETTINGS, getSettings } from "@/db/workspace";
+import { isEmailAllowed } from "@/lib/env";
+import { getCurrentUser } from "@/server/auth";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +29,17 @@ export const metadata: Metadata = {
   },
 };
 
+/** Public pages use the defaults; only allowed users get a workspace. */
+async function getRequestSettings() {
+  const user = await getCurrentUser();
+  if (!user || !isEmailAllowed(user.email)) {
+    return DEFAULT_SETTINGS;
+  }
+  return getSettings(user.id);
+}
+
 export async function generateViewport(): Promise<Viewport> {
-  const { theme } = getSettings();
+  const { theme } = await getRequestSettings();
 
   return {
     width: "device-width",
@@ -39,10 +50,10 @@ export async function generateViewport(): Promise<Viewport> {
   };
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const settings = getSettings();
+  const settings = await getRequestSettings();
 
   return (
     <html lang={settings.language} data-theme={settings.theme}>

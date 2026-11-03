@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { TranslationKey } from "@lib/i18n/dictionary";
 import { SettingsControls } from "./settings-controls";
 import { useI18n } from "./settings-provider";
+import { UserMenu, type SessionUserView } from "./user-menu";
 
 type NavIconName = "study" | "import" | "filters" | "library";
 
@@ -81,20 +82,29 @@ function NavIcon({ name }: { name: NavIconName }) {
  * bar; from `lg` up it becomes a sidebar with a wide content area. Routes stay
  * real URLs, so back/forward, deep links and the PWA keep working.
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  user,
+}: {
+  children: React.ReactNode;
+  user: SessionUserView;
+}) {
   const { t } = useI18n();
   const pathname = usePathname();
 
   return (
     <div className="min-h-dvh md:flex">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-2 backdrop-blur md:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur md:hidden">
         <Link
           href="/"
           className="text-sm font-semibold uppercase tracking-[0.2em] text-muted"
         >
           {t("common.appName")}
         </Link>
-        <SettingsControls />
+        <div className="flex items-center gap-2">
+          <SettingsControls />
+          <UserMenu user={user} compact />
+        </div>
       </header>
 
       <aside className="hidden md:sticky md:top-0 md:flex md:h-dvh md:w-64 md:shrink-0 md:flex-col md:border-r md:border-border md:bg-surface md:px-4 md:py-6">
@@ -130,8 +140,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="pt-4">
+        <div className="space-y-3 pt-4">
           <SettingsControls />
+          <UserMenu user={user} />
         </div>
       </aside>
 

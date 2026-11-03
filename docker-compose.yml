@@ -8,7 +8,11 @@ services:
       - "${APP_PORT:-3000}:3000"
     environment:
       DATABASE_PATH: /app/data/app.db
-      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in .env}
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
     volumes:
       - ./data:/app/data
     healthcheck:

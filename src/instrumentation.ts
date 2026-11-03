@@ -3,6 +3,9 @@ export async function register(): Promise<void> {
     return;
   }
 
+  const { assertRuntimeEnv } = await import("./lib/env");
+  assertRuntimeEnv();
+
   const { bootstrapDatabase } = await import("./db/bootstrap");
   bootstrapDatabase();
 }

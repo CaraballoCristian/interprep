@@ -1,4 +1,5 @@
 import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
 import { removeTemplate, updateTemplateConfig } from "@/server/templates";
 import { templateUpdateSchema } from "@/server/validation";
 
@@ -26,7 +27,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    return Response.json({ template: updateTemplateConfig(id, parsed.data) });
+    const user = await requireUser();
+    return Response.json({
+      template: updateTemplateConfig(user.id, id, parsed.data),
+    });
   } catch (cause) {
     return errorResponse(cause);
   }
@@ -36,7 +40,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    removeTemplate(id);
+    const user = await requireUser();
+    removeTemplate(user.id, id);
     return Response.json({ ok: true });
   } catch (cause) {
     return errorResponse(cause);

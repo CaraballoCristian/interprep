@@ -4,6 +4,7 @@
   "description": "Entrenador de terminología para intérpretes — Modo Repetición Intensivo.",
   "lang": "es",
   "dir": "ltr",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

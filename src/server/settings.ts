@@ -1,5 +1,5 @@
 import type { Language, Theme } from "@lib/types";
-import { getSettings } from "@/db/bootstrap";
+import { getSettings } from "@/db/workspace";
 import { updateSettings } from "@/db/repositories/settings";
 
 export type SettingsView = {
@@ -25,13 +25,16 @@ function toView(row: {
   };
 }
 
-export function readSettings(): SettingsView {
-  return toView(getSettings());
+export function readSettings(userId: string): SettingsView {
+  return toView(getSettings(userId));
 }
 
 /** Applies a partial preference update and returns the stored settings. */
-export function writeSettings(input: SettingsUpdate): SettingsView {
+export function writeSettings(
+  userId: string,
+  input: SettingsUpdate,
+): SettingsView {
   // Guarantees the row exists before the upsert.
-  getSettings();
-  return toView(updateSettings(input));
+  getSettings(userId);
+  return toView(updateSettings(userId, input));
 }

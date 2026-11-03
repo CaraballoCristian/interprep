@@ -1,12 +1,14 @@
 import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
 import { createDeckFromInput, listDeckViews } from "@/server/decks";
 import { deckCreateSchema } from "@/server/validation";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
+export async function GET() {
   try {
-    return Response.json({ decks: listDeckViews() });
+    const user = await requireUser();
+    return Response.json({ decks: listDeckViews(user.id) });
   } catch (cause) {
     return errorResponse(cause);
   }
@@ -30,8 +32,9 @@ export async function POST(request: Request) {
   }
 
   try {
+    const user = await requireUser();
     return Response.json(
-      { deck: createDeckFromInput(parsed.data) },
+      { deck: createDeckFromInput(user.id, parsed.data) },
       { status: 201 },
     );
   } catch (cause) {

@@ -39,7 +39,7 @@ import {
 } from "@/db/repositories/session";
 import { getTemplateById } from "@/db/repositories/templates";
 import type { Template } from "@/db/schema";
-import { getSettings } from "@/db/bootstrap";
+import { getSettings } from "@/db/workspace";
 import { pruneConfigDecks } from "./decks";
 
 export type StudyErrorCode =
@@ -144,10 +144,15 @@ function freshSession(
   };
 }
 
-function repairSession(session: StudySession): StudySession {
-  const cards = listStudyCards();
-  const existingDeckIds = new Set(listDecks().map((deck) => deck.id));
-  const config = pruneConfigDecks(session.config, existingDeckIds);
+function repairSession(
+  userId: string,
+  session: StudySession,
+): StudySession {
+  const cards = listStudyCards(userId);
+  const existingDeckIds = new Set(
+    listDecks(userId).map((deck) => deck.id),
+  );
+  const config = pruneConfigDecks(userId, session.config, existingDeckIds);
   const deck = buildDeck(cards, config);
   const round = repairRound(session.round, cards, config);
   const cardsById = new Map(cards.map((card) => [card.id, card]));
@@ -175,29 +180,32 @@ function repairSession(session: StudySession): StudySession {
 }
 
 /** Loads the persisted session, creating or repairing it when needed. */
-function ensureSession(): StudySession {
-  const existing = loadStudySession();
+function ensureSession(userId: string): StudySession {
+  const existing = loadStudySession(userId);
   if (existing) {
-    const repaired = repairSession(existing);
+    const repaired = repairSession(userId, existing);
     if (repaired !== existing) {
-      saveStudySession(repaired);
+      saveStudySession(userId, repaired);
     }
     return repaired;
   }
 
-  const settings = getSettings();
+  const settings = getSettings(userId);
   const template = settings.lastTemplateId
-    ? getTemplateById(settings.lastTemplateId)
+    ? getTemplateById(userId, settings.lastTemplateId)
     : null;
   const { config, templateId } = configFromTemplate(template);
-  const session = freshSession(config, templateId, listStudyCards());
+  const session = freshSession(config, templateId, listStudyCards(userId));
 
-  saveStudySession(session);
+  saveStudySession(userId, session);
   return session;
 }
 
-function persist(session: StudySession): void {
-  saveStudySession({ ...session, updatedAt: new Date().toISOString() });
+function persist(userId: string, session: StudySession): void {
+  saveStudySession(userId, {
+    ...session,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 /** The next visit should ask whether to resume once the round has answers. */
@@ -210,10 +218,11 @@ type BuildViewOptions = {
 };
 
 function buildView(
+  userId: string,
   session: StudySession,
   options: BuildViewOptions = {},
 ): StudyView {
-  const cards = listStudyCards();
+  const cards = listStudyCards(userId);
   const cardsById = new Map(cards.map((card) => [card.id, card]));
   const round = refillRound(session.round);
   const currentId = currentCardId(round);
@@ -246,9 +255,12 @@ function buildView(
   };
 }
 
-function currentCardOrThrow(session: StudySession): StudyCard {
+function currentCardOrThrow(
+  userId: string,
+  session: StudySession,
+): StudyCard {
   const id = currentCardId(session.round);
-  const card = id ? getStudyCard(id) : null;
+  const card = id ? getStudyCard(userId, id) : null;
   if (!card) {
     throw new StudyError("no_current_card");
   }
@@ -256,18 +268,19 @@ function currentCardOrThrow(session: StudySession): StudyCard {
 }
 
 /** Returns the current view of the study session. */
-export function getStudyView(): StudyView {
-  const session = ensureSession();
-  return buildView(session);
+export function getStudyView(userId: string): StudyView {
+  const session = ensureSession(userId);
+  return buildView(userId, session);
 }
 
 /** Applies a study action, persists the session and returns the new view. */
 export function applyStudyAction(
+  userId: string,
   action: StudyAction,
   now = Date.now(),
   random: () => number = Math.random,
 ): StudyView {
-  const session = ensureSession();
+  const session = ensureSession(userId);
 
   switch (action.type) {
     case "flip": {
@@ -276,8 +289,8 @@ export function applyStudyAction(
         session.revealed = true;
       }
       markResumePending(session);
-      persist(session);
-      return buildView(session, { suppressResumePrompt: true });
+      persist(userId, session);
+      return buildView(userId, session, { suppressResumePrompt: true });
     }
 
     case "status": {
@@ -285,7 +298,7 @@ export function applyStudyAction(
         throw new StudyError("not_revealed");
       }
 
-      const card = currentCardOrThrow(session);
+      const card = currentCardOrThrow(userId, session);
       session.undoStack = pushUndo(
         session.undoStack,
         createSessionUndo(
@@ -305,7 +318,7 @@ export function applyStudyAction(
             ? applyResultToCard(card, "f")
             : card;
 
-      updateCardStudyFields(card.id, {
+      updateCardStudyFields(userId, card.id, {
         status: action.status,
         history: withResult.history,
         totalSuccess: withResult.totalSuccess,
@@ -319,12 +332,12 @@ export function applyStudyAction(
       session.flipped = false;
       session.revealed = false;
       markResumePending(session);
-      persist(session);
-      return buildView(session, { suppressResumePrompt: true });
+      persist(userId, session);
+      return buildView(userId, session, { suppressResumePrompt: true });
     }
 
     case "hide": {
-      const card = currentCardOrThrow(session);
+      const card = currentCardOrThrow(userId, session);
       session.undoStack = pushUndo(
         session.undoStack,
         createSessionUndo(
@@ -337,13 +350,13 @@ export function applyStudyAction(
         ),
       );
 
-      updateCardHidden(card.id, true);
+      updateCardHidden(userId, card.id, true);
       session.round = removeCurrentFromRound(session.round);
       session.flipped = false;
       session.revealed = false;
       markResumePending(session);
-      persist(session);
-      return buildView(session, { suppressResumePrompt: true });
+      persist(userId, session);
+      return buildView(userId, session, { suppressResumePrompt: true });
     }
 
     case "undo": {
@@ -352,22 +365,22 @@ export function applyStudyAction(
         throw new StudyError("undo_unavailable");
       }
 
-      restoreCardFields(undo.entry.cardId, undo.entry.snapshot);
+      restoreCardFields(userId, undo.entry.cardId, undo.entry.snapshot);
       session.round = repairRound(
         undo.round,
-        listStudyCards(),
+        listStudyCards(userId),
         session.config,
       );
       session.flipped = undo.flipped;
       session.revealed = undo.revealed;
       session.undoStack = session.undoStack.slice(0, -1);
       markResumePending(session);
-      persist(session);
-      return buildView(session, { suppressResumePrompt: true });
+      persist(userId, session);
+      return buildView(userId, session, { suppressResumePrompt: true });
     }
 
     case "new-round": {
-      const cards = listStudyCards();
+      const cards = listStudyCards(userId);
       session.round = createRound(
         buildDeck(cards, session.config),
         modeFor(session.config),
@@ -377,12 +390,12 @@ export function applyStudyAction(
       session.revealed = false;
       session.undoStack = [];
       markResumePending(session);
-      persist(session);
-      return buildView(session, { suppressResumePrompt: true });
+      persist(userId, session);
+      return buildView(userId, session, { suppressResumePrompt: true });
     }
 
     case "review": {
-      const cards = listStudyCards();
+      const cards = listStudyCards(userId);
       const round = createReviewRound(
         cards,
         session.round,
@@ -399,43 +412,43 @@ export function applyStudyAction(
       session.revealed = false;
       session.undoStack = [];
       markResumePending(session);
-      persist(session);
-      return buildView(session, { suppressResumePrompt: true });
+      persist(userId, session);
+      return buildView(userId, session, { suppressResumePrompt: true });
     }
 
     case "resume": {
       session.resumePending = false;
-      persist(session);
-      return buildView(session);
+      persist(userId, session);
+      return buildView(userId, session);
     }
 
     case "reset": {
       const fresh = freshSession(
         session.config,
         session.templateId,
-        listStudyCards(),
+        listStudyCards(userId),
         random,
       );
       fresh.createdAt = session.createdAt;
-      persist(fresh);
-      return buildView(fresh);
+      persist(userId, fresh);
+      return buildView(userId, fresh);
     }
 
     case "finish": {
       const fresh = freshSession(
         session.config,
         session.templateId,
-        listStudyCards(),
+        listStudyCards(userId),
         random,
       );
-      persist(fresh);
-      return buildView(fresh, { suppressResumePrompt: true });
+      persist(userId, fresh);
+      return buildView(userId, fresh, { suppressResumePrompt: true });
     }
 
     case "leave": {
       markResumePending(session);
-      persist(session);
-      return buildView(session, { suppressResumePrompt: true });
+      persist(userId, session);
+      return buildView(userId, session, { suppressResumePrompt: true });
     }
   }
 }
@@ -446,30 +459,34 @@ export function applyStudyAction(
  * comes from manual filters.
  */
 export function applyStudyConfig(
+  userId: string,
   inputConfig: StudyConfig,
   templateId: string | null = null,
 ): StudyView {
-  const session = ensureSession();
-  const cards = listStudyCards();
-  const config = pruneConfigDecks(inputConfig);
+  const session = ensureSession(userId);
+  const cards = listStudyCards(userId);
+  const config = pruneConfigDecks(userId, inputConfig);
   const fresh = freshSession(config, templateId, cards);
   fresh.createdAt = session.createdAt;
 
-  persist(fresh);
-  return buildView(fresh, { suppressResumePrompt: true });
+  persist(userId, fresh);
+  return buildView(userId, fresh, { suppressResumePrompt: true });
 }
 
 /**
  * Detaches a deleted template from the saved session without creating one or
  * touching the current round.
  */
-export function detachSessionTemplate(templateId: string): void {
-  const session = loadStudySession();
+export function detachSessionTemplate(
+  userId: string,
+  templateId: string,
+): void {
+  const session = loadStudySession(userId);
   if (!session || session.templateId !== templateId) {
     return;
   }
 
-  saveStudySession({
+  saveStudySession(userId, {
     ...session,
     templateId: null,
     updatedAt: new Date().toISOString(),

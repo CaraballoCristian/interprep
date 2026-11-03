@@ -1,12 +1,14 @@
 import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
 import { readSettings, writeSettings } from "@/server/settings";
 import { settingsUpdateSchema } from "@/server/validation";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
+export async function GET() {
   try {
-    return Response.json({ settings: readSettings() });
+    const user = await requireUser();
+    return Response.json({ settings: readSettings(user.id) });
   } catch (cause) {
     return errorResponse(cause);
   }
@@ -30,7 +32,10 @@ export async function PUT(request: Request) {
   }
 
   try {
-    return Response.json({ settings: writeSettings(parsed.data) });
+    const user = await requireUser();
+    return Response.json({
+      settings: writeSettings(user.id, parsed.data),
+    });
   } catch (cause) {
     return errorResponse(cause);
   }

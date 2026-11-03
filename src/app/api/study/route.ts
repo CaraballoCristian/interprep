@@ -1,10 +1,8 @@
 import { z } from "zod";
 import { CARD_STATUSES } from "@lib/types";
-import {
-  applyStudyAction,
-  getStudyView,
-  StudyError,
-} from "@/server/study";
+import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
+import { applyStudyAction, getStudyView } from "@/server/study";
 
 export const dynamic = "force-dynamic";
 
@@ -24,18 +22,10 @@ const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("leave") }),
 ]);
 
-function errorResponse(cause: unknown): Response {
-  if (cause instanceof StudyError) {
-    return Response.json({ error: cause.code }, { status: 409 });
-  }
-
-  console.error(cause);
-  return Response.json({ error: "internal_error" }, { status: 500 });
-}
-
-export function GET() {
+export async function GET() {
   try {
-    return Response.json(getStudyView());
+    const user = await requireUser();
+    return Response.json(getStudyView(user.id));
   } catch (cause) {
     return errorResponse(cause);
   }
@@ -58,7 +48,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    return Response.json(applyStudyAction(parsed.data));
+    const user = await requireUser();
+    return Response.json(applyStudyAction(user.id, parsed.data));
   } catch (cause) {
     return errorResponse(cause);
   }

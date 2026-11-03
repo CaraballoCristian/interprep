@@ -25,6 +25,7 @@ export type ImportAnalysis = {
  * DB. `headerRowInput` is 1-based; omitted means auto-detect.
  */
 export function analyzeImport(
+  userId: string,
   content: string,
   mappingInput: Partial<ColumnMapping> | undefined,
   headerRowInput: number | undefined,
@@ -41,7 +42,7 @@ export function analyzeImport(
   const validation = validateMapping(mapping, table.headers.length);
   const preview = buildPreview(table, mapping);
   const plan = validation.valid
-    ? buildImportPlan(preview.rows, listCardsForMatching(deckId))
+    ? buildImportPlan(preview.rows, listCardsForMatching(userId, deckId))
     : null;
 
   return {

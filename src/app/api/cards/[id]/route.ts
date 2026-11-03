@@ -1,4 +1,5 @@
 import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
 import { removeCard, updateCardFromInput } from "@/server/library";
 import { cardUpdateSchema } from "@/server/validation";
 
@@ -29,7 +30,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    return Response.json({ card: updateCardFromInput(id, parsed.data) });
+    const user = await requireUser();
+    return Response.json({
+      card: updateCardFromInput(user.id, id, parsed.data),
+    });
   } catch (cause) {
     return errorResponse(cause);
   }
@@ -40,7 +44,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    removeCard(id);
+    const user = await requireUser();
+    removeCard(user.id, id);
     return Response.json({ ok: true });
   } catch (cause) {
     return errorResponse(cause);

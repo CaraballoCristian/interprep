@@ -1,12 +1,14 @@
 import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
 import { listTemplateViews, saveTemplate } from "@/server/templates";
 import { templateCreateSchema } from "@/server/validation";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
+export async function GET() {
   try {
-    return Response.json({ templates: listTemplateViews() });
+    const user = await requireUser();
+    return Response.json({ templates: listTemplateViews(user.id) });
   } catch (cause) {
     return errorResponse(cause);
   }
@@ -30,8 +32,9 @@ export async function POST(request: Request) {
   }
 
   try {
+    const user = await requireUser();
     return Response.json(
-      { template: saveTemplate(parsed.data) },
+      { template: saveTemplate(user.id, parsed.data) },
       { status: 201 },
     );
   } catch (cause) {

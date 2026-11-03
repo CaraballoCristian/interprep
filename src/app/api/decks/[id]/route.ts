@@ -1,4 +1,5 @@
 import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
 import { removeDeck, renameDeckFromInput } from "@/server/decks";
 import { deckUpdateSchema } from "@/server/validation";
 
@@ -26,7 +27,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    return Response.json({ deck: renameDeckFromInput(id, parsed.data) });
+    const user = await requireUser();
+    return Response.json({
+      deck: renameDeckFromInput(user.id, id, parsed.data),
+    });
   } catch (cause) {
     return errorResponse(cause);
   }
@@ -37,7 +41,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    return Response.json({ ok: true, ...removeDeck(id) });
+    const user = await requireUser();
+    return Response.json({ ok: true, ...removeDeck(user.id, id) });
   } catch (cause) {
     return errorResponse(cause);
   }

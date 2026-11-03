@@ -1,3 +1,4 @@
+import { ForbiddenError, UnauthorizedError } from "./auth";
 import { DeckError } from "./decks";
 import { LibraryError } from "./library";
 import { StudyError } from "./study";
@@ -5,6 +6,14 @@ import { TemplateError } from "./templates";
 
 /** Maps domain errors to REST responses; unknown errors become a 500. */
 export function errorResponse(cause: unknown): Response {
+  if (cause instanceof UnauthorizedError) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  if (cause instanceof ForbiddenError) {
+    return Response.json({ error: "forbidden" }, { status: 403 });
+  }
+
   if (cause instanceof LibraryError) {
     const status =
       cause.code === "not_found"

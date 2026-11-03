@@ -1,5 +1,6 @@
 import { validateConfig } from "@lib/templates/validation";
 import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
 import { applyStudyConfig } from "@/server/study";
 import { getFiltersView } from "@/server/templates";
 import { sessionUpdateSchema } from "@/server/validation";
@@ -7,9 +8,10 @@ import { sessionUpdateSchema } from "@/server/validation";
 export const dynamic = "force-dynamic";
 
 /** Current session config plus the options needed by the filters screen. */
-export function GET() {
+export async function GET() {
   try {
-    return Response.json(getFiltersView());
+    const user = await requireUser();
+    return Response.json(getFiltersView(user.id));
   } catch (cause) {
     return errorResponse(cause);
   }
@@ -41,8 +43,9 @@ export async function PUT(request: Request) {
   }
 
   try {
-    applyStudyConfig(validation.config, null);
-    return Response.json(getFiltersView());
+    const user = await requireUser();
+    applyStudyConfig(user.id, validation.config, null);
+    return Response.json(getFiltersView(user.id));
   } catch (cause) {
     return errorResponse(cause);
   }

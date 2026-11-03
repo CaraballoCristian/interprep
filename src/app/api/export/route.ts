@@ -1,11 +1,12 @@
 import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
 import { buildExport } from "@/server/library";
 import { exportFormatSchema } from "@/server/validation";
 
 export const dynamic = "force-dynamic";
 
 /** Full backup of every card as CSV or JSON. */
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const parsed = exportFormatSchema.safeParse(params.get("format") ?? "csv");
 
@@ -14,7 +15,8 @@ export function GET(request: Request) {
   }
 
   try {
-    const file = buildExport(parsed.data);
+    const user = await requireUser();
+    const file = buildExport(user.id, parsed.data);
     // Spreadsheets need the BOM to read UTF-8 accents correctly.
     const body = parsed.data === "csv" ? `\uFEFF${file.body}` : file.body;
 

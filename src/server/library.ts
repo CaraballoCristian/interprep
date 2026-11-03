@@ -81,16 +81,20 @@ export function parseLibraryFilter(params: URLSearchParams): LibraryFilter {
 }
 
 export function getLibraryView(
+  userId: string,
   filter: LibraryFilter = DEFAULT_LIBRARY_FILTER,
 ): LibraryView {
-  const all = listLibraryCards();
+  const all = listLibraryCards(userId);
   const cards = filterCards(all, filter);
-  const decks = listDeckSummaries();
+  const decks = listDeckSummaries(userId);
 
   return {
     filter,
     cards,
-    categories: listCategories(filter.deckId ? [filter.deckId] : null),
+    categories: listCategories(
+      userId,
+      filter.deckId ? [filter.deckId] : null,
+    ),
     decks,
     total: all.length,
     visible: all.filter((card) => !card.hidden).length,
@@ -113,9 +117,9 @@ function readDeckId(value: unknown): unknown {
     : undefined;
 }
 
-function requireDeck(value: unknown): string {
+function requireDeck(userId: string, value: unknown): string {
   try {
-    return resolveDeckId(value);
+    return resolveDeckId(userId, value);
   } catch (cause) {
     if (cause instanceof DeckError) {
       throw new LibraryError("deck_not_found");
@@ -125,11 +129,13 @@ function requireDeck(value: unknown): string {
 }
 
 function requireUniqueTerms(
+  userId: string,
   deckId: string,
   input: Pick<LibraryCardInput, "termEng" | "termEsp">,
   excludeId?: string,
 ): void {
   const existing = findCardByMatchKey(
+    userId,
     deckId,
     matchKey(input.termEng, input.termEsp),
     excludeId,
@@ -141,11 +147,14 @@ function requireUniqueTerms(
 }
 
 /** Creates a visible card. History and counters start empty. */
-export function createCardFromInput(input: unknown): LibraryCard {
+export function createCardFromInput(
+  userId: string,
+  input: unknown,
+): LibraryCard {
   const card = requireCardInput(input);
-  const deckId = requireDeck(readDeckId(input));
-  requireUniqueTerms(deckId, card);
-  return createCard({ ...card, deckId });
+  const deckId = requireDeck(userId, readDeckId(input));
+  requireUniqueTerms(userId, deckId, card);
+  return createCard(userId, { ...card, deckId });
 }
 
 export type CardPatch = {
@@ -163,10 +172,11 @@ export type CardPatch = {
  * validated as a whole; `hidden` can be changed alone or together with them.
  */
 export function updateCardFromInput(
+  userId: string,
   id: string,
   patch: CardPatch,
 ): LibraryCard {
-  const existing = getCardById(id);
+  const existing = getCardById(userId, id);
   if (!existing) {
     throw new LibraryError("not_found");
   }
@@ -187,7 +197,9 @@ export function updateCardFromInput(
   }
 
   if (hasContent || hasDeck) {
-    const deckId = hasDeck ? requireDeck(patch.deckId) : existing.deckId;
+    const deckId = hasDeck
+      ? requireDeck(userId, patch.deckId)
+      : existing.deckId;
     const merged = requireCardInput({
       termEng: patch.termEng ?? existing.termEng,
       termEsp: patch.termEsp ?? existing.termEsp,
@@ -196,18 +208,18 @@ export function updateCardFromInput(
       status: patch.status ?? existing.status,
     });
 
-    requireUniqueTerms(deckId, merged, id);
-    updateCard(id, { ...merged, deckId });
+    requireUniqueTerms(userId, deckId, merged, id);
+    updateCard(userId, id, { ...merged, deckId });
   }
 
   if (hasHidden) {
     if (typeof patch.hidden !== "boolean") {
       throw new LibraryError("invalid_hidden");
     }
-    updateCardHidden(id, patch.hidden);
+    updateCardHidden(userId, id, patch.hidden);
   }
 
-  const updated = getCardById(id);
+  const updated = getCardById(userId, id);
   if (!updated) {
     throw new LibraryError("not_found");
   }
@@ -215,34 +227,42 @@ export function updateCardFromInput(
 }
 
 /** Shows or hides a card. Hiding keeps it recoverable from the library. */
-export function setCardVisibility(id: string, hidden: boolean): LibraryCard {
-  if (!getCardById(id)) {
+export function setCardVisibility(
+  userId: string,
+  id: string,
+  hidden: boolean,
+): LibraryCard {
+  if (!getCardById(userId, id)) {
     throw new LibraryError("not_found");
   }
 
-  updateCardHidden(id, hidden);
+  updateCardHidden(userId, id, hidden);
 
-  const updated = getCardById(id);
+  const updated = getCardById(userId, id);
   if (!updated) {
     throw new LibraryError("not_found");
   }
   return updated;
 }
 
-export function removeCard(id: string): void {
-  if (!deleteCard(id)) {
+export function removeCard(userId: string, id: string): void {
+  if (!deleteCard(userId, id)) {
     throw new LibraryError("not_found");
   }
 }
 
 /** Full backup of every card, including hidden ones and their history. */
 export function buildExport(
+  userId: string,
   format: ExportFormat,
   now = new Date(),
 ): ExportFile {
-  const cards = filterCards(listLibraryCards(), DEFAULT_LIBRARY_FILTER);
+  const cards = filterCards(
+    listLibraryCards(userId),
+    DEFAULT_LIBRARY_FILTER,
+  );
   const deckNames = new Map(
-    listDeckSummaries().map((deck) => [deck.id, deck.name]),
+    listDeckSummaries(userId).map((deck) => [deck.id, deck.name]),
   );
   const stamp = now.toISOString().slice(0, 10);
 

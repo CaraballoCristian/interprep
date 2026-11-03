@@ -374,6 +374,18 @@ const es = {
   "library.error.invalidJson": "La solicitud no es válida.",
   "library.error.generic": "No se pudo completar la acción.",
   "library.uncategorized": "Sin categoría",
+
+  "auth.loginTitle": "Entrá a Interprep",
+  "auth.loginDescription":
+    "Iniciá sesión con Google para guardar tus mazos, tarjetas y progreso.",
+  "auth.google": "Continuar con Google",
+  "auth.redirecting": "Redirigiendo…",
+  "auth.error": "No se pudo iniciar sesión. Intentá de nuevo.",
+  "auth.accessDenied":
+    "Esta cuenta no tiene acceso a esta instancia. Probá con otra cuenta.",
+  "auth.signOut": "Cerrar sesión",
+  "auth.signedInAs": "Sesión iniciada como {email}",
+  "auth.secureNote": "Cada cuenta tiene sus propios mazos y tarjetas.",
 } as const;
 
 export type TranslationKey = keyof typeof es;
@@ -742,6 +754,18 @@ const en: Record<TranslationKey, string> = {
   "library.error.invalidJson": "The request is not valid.",
   "library.error.generic": "The action could not be completed.",
   "library.uncategorized": "Uncategorized",
+
+  "auth.loginTitle": "Sign in to Interprep",
+  "auth.loginDescription":
+    "Sign in with Google to save your decks, cards and progress.",
+  "auth.google": "Continue with Google",
+  "auth.redirecting": "Redirecting…",
+  "auth.error": "Sign-in failed. Please try again.",
+  "auth.accessDenied":
+    "This account is not allowed on this instance. Try another account.",
+  "auth.signOut": "Sign out",
+  "auth.signedInAs": "Signed in as {email}",
+  "auth.secureNote": "Every account keeps its own decks and cards.",
 };
 
 export const dictionaries: Record<

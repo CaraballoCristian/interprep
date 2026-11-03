@@ -1,5 +1,6 @@
 import type { ImportPreviewResponse } from "@lib/import/api-types";
 import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
 import { resolveDeckId } from "@/server/decks";
 import { countCards } from "@/db/repositories/cards";
 import { analyzeImport } from "@/server/import";
@@ -24,8 +25,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const deckId = resolveDeckId(parsed.data.deckId);
+    const user = await requireUser();
+    const deckId = resolveDeckId(user.id, parsed.data.deckId);
     const analysis = analyzeImport(
+      user.id,
       parsed.data.content,
       parsed.data.mapping,
       parsed.data.headerRow,
@@ -53,7 +56,7 @@ export async function POST(request: Request) {
             validRows: plan.validRows,
           }
         : null,
-      existingCards: countCards([deckId]),
+      existingCards: countCards(user.id, [deckId]),
       parseErrors: analysis.table.parseErrors,
     };
 

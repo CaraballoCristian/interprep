@@ -6,12 +6,12 @@ import {
 import { getDb } from "../client";
 import { sessionState } from "../schema";
 
-export function loadStudySession(): StudySession | null {
+export function loadStudySession(userId: string): StudySession | null {
   try {
     const row = getDb()
       .select()
       .from(sessionState)
-      .where(eq(sessionState.id, "default"))
+      .where(eq(sessionState.userId, userId))
       .get();
 
     if (!row) {
@@ -25,12 +25,20 @@ export function loadStudySession(): StudySession | null {
   }
 }
 
-export function saveStudySession(session: StudySession): void {
+export function saveStudySession(
+  userId: string,
+  session: StudySession,
+): void {
   const data = session as unknown as Record<string, unknown>;
 
   getDb()
     .insert(sessionState)
-    .values({ id: "default", data, updatedAt: session.updatedAt })
+    .values({
+      id: userId,
+      userId,
+      data,
+      updatedAt: session.updatedAt,
+    })
     .onConflictDoUpdate({
       target: sessionState.id,
       set: { data, updatedAt: session.updatedAt },

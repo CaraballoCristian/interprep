@@ -19,6 +19,9 @@ import {
   type SideField,
   type Theme,
 } from "../../lib/types";
+import { user } from "./auth-schema";
+
+export * from "./auth-schema";
 
 export {
   CARD_RESULTS,
@@ -44,17 +47,25 @@ export const decks = sqliteTable(
   "decks",
   {
     id: text("id").primaryKey(),
+    userId: text("user_id").references(() => user.id, {
+      onDelete: "cascade",
+    }),
     name: text("name").notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (table) => [uniqueIndex("decks_name_unique").on(table.name)],
+  (table) => [
+    uniqueIndex("decks_user_name_unique").on(table.userId, table.name),
+  ],
 );
 
 export const cards = sqliteTable(
   "cards",
   {
     id: text("id").primaryKey(),
+    userId: text("user_id").references(() => user.id, {
+      onDelete: "cascade",
+    }),
     deckId: text("deck_id")
       .notNull()
       .references(() => decks.id, { onDelete: "cascade" }),
@@ -76,7 +87,11 @@ export const cards = sqliteTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex("cards_deck_match_unique").on(table.deckId, table.matchKey),
+    uniqueIndex("cards_user_deck_match_unique").on(
+      table.userId,
+      table.deckId,
+      table.matchKey,
+    ),
     index("cards_deck_idx").on(table.deckId),
     index("cards_category_idx").on(table.category),
     index("cards_status_idx").on(table.status),
@@ -88,6 +103,9 @@ export const templates = sqliteTable(
   "templates",
   {
     id: text("id").primaryKey(),
+    userId: text("user_id").references(() => user.id, {
+      onDelete: "cascade",
+    }),
     name: text("name").notNull(),
     sideA: text("side_a", { mode: "json" }).$type<SideField[]>().notNull(),
     sideB: text("side_b", { mode: "json" }).$type<SideField[]>().notNull(),
@@ -105,27 +123,43 @@ export const templates = sqliteTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (table) => [uniqueIndex("templates_name_unique").on(table.name)],
+  (table) => [
+    uniqueIndex("templates_user_name_unique").on(table.userId, table.name),
+  ],
 );
 
-export const settings = sqliteTable("settings", {
-  id: text("id").primaryKey().default("default"),
-  theme: text("theme", { enum: THEMES }).notNull().default("dark"),
-  language: text("language", { enum: LANGUAGES }).notNull().default("es"),
-  lastTemplateId: text("last_template_id").references(() => templates.id, {
-    onDelete: "set null",
-  }),
-  updatedAt: updatedAt(),
-});
+export const settings = sqliteTable(
+  "settings",
+  {
+    id: text("id").primaryKey().default("default"),
+    userId: text("user_id").references(() => user.id, {
+      onDelete: "cascade",
+    }),
+    theme: text("theme", { enum: THEMES }).notNull().default("dark"),
+    language: text("language", { enum: LANGUAGES }).notNull().default("es"),
+    lastTemplateId: text("last_template_id").references(() => templates.id, {
+      onDelete: "set null",
+    }),
+    updatedAt: updatedAt(),
+  },
+  (table) => [uniqueIndex("settings_user_unique").on(table.userId)],
+);
 
-export const sessionState = sqliteTable("session_state", {
-  id: text("id").primaryKey().default("default"),
-  /** Serialized snapshot of the round in progress. */
-  data: text("data", { mode: "json" })
-    .$type<Record<string, unknown>>()
-    .notNull(),
-  updatedAt: updatedAt(),
-});
+export const sessionState = sqliteTable(
+  "session_state",
+  {
+    id: text("id").primaryKey().default("default"),
+    userId: text("user_id").references(() => user.id, {
+      onDelete: "cascade",
+    }),
+    /** Serialized snapshot of the round in progress. */
+    data: text("data", { mode: "json" })
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [uniqueIndex("session_state_user_unique").on(table.userId)],
+);
 
 export type Deck = typeof decks.$inferSelect;
 export type NewDeck = typeof decks.$inferInsert;

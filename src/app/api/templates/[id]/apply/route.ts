@@ -1,4 +1,5 @@
 import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
 import { applyTemplateToSession } from "@/server/templates";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,8 @@ export async function POST(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    return Response.json(applyTemplateToSession(id));
+    const user = await requireUser();
+    return Response.json(applyTemplateToSession(user.id, id));
   } catch (cause) {
     return errorResponse(cause);
   }

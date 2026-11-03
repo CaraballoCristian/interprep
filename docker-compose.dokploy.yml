@@ -1,0 +1,40 @@
+# Dokploy service definition.
+#
+# Use this file as the Compose path in Dokploy. Dokploy terminates TLS and
+# routes the domain to port 3000, so there is no `ports` mapping here.
+# Environment variables are configured in the Dokploy UI (Environment tab).
+#
+# The SQLite file lives in the named volume `interprep_data`. Named volumes are
+# required for Dokploy's volume backups.
+
+services:
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      DATABASE_PATH: /app/data/app.db
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Set BETTER_AUTH_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET}
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
+    volumes:
+      - interprep_data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  interprep_data:

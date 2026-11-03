@@ -5,6 +5,7 @@ data
 .gitignore
 Dockerfile
 docker-compose.yml
+docker-compose.dokploy.yml
 README.md
 SPEC.md
 .env

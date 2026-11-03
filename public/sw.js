@@ -1,12 +1,9 @@
-/* Interprep app-shell service worker. Data always comes from /api/. */
+/* Interprep service worker: static assets only, never authenticated data. */
 
-const CACHE_NAME = "interprep-shell-v2";
+const CACHE_NAME = "interprep-static-v3";
 
-const SHELL = [
-  "/",
-  "/import",
-  "/filters",
-  "/library",
+const STATIC_ASSETS = [
+  "/offline.html",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -18,7 +15,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(SHELL))
+      .then((cache) => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting()),
   );
 });
@@ -38,28 +35,6 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-async function networkFirst(request) {
-  const cache = await caches.open(CACHE_NAME);
-
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      await cache.put(request, response.clone());
-    }
-    return response;
-  } catch {
-    const cached = await cache.match(request);
-    if (cached) {
-      return cached;
-    }
-    const shell = await cache.match("/");
-    if (shell) {
-      return shell;
-    }
-    throw new Error("offline");
-  }
-}
-
 async function cacheFirst(request) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(request);
@@ -74,6 +49,17 @@ async function cacheFirst(request) {
   return response;
 }
 
+async function offlinePage() {
+  const cache = await caches.open(CACHE_NAME);
+  return (
+    (await cache.match("/offline.html")) ??
+    new Response("Offline", {
+      status: 503,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    })
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
@@ -86,13 +72,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Study data, cards and settings must never be served stale.
+  // Authenticated data and auth flows always go to the network.
   if (url.pathname.startsWith("/api/")) {
     return;
   }
 
+  // Pages are never cached: they contain per-user data and redirect to login.
   if (request.mode === "navigate") {
-    event.respondWith(networkFirst(request));
+    event.respondWith(fetch(request).catch(() => offlinePage()));
     return;
   }
 

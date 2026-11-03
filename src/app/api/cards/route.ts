@@ -1,4 +1,5 @@
 import { errorResponse } from "@/server/api-errors";
+import { requireUser } from "@/server/auth";
 import {
   createCardFromInput,
   getLibraryView,
@@ -9,10 +10,13 @@ import { cardCreateSchema } from "@/server/validation";
 export const dynamic = "force-dynamic";
 
 /** Library listing with server-side search and filters. */
-export function GET(request: Request) {
+export async function GET(request: Request) {
   try {
+    const user = await requireUser();
     const params = new URL(request.url).searchParams;
-    return Response.json(getLibraryView(parseLibraryFilter(params)));
+    return Response.json(
+      getLibraryView(user.id, parseLibraryFilter(params)),
+    );
   } catch (cause) {
     return errorResponse(cause);
   }
@@ -36,8 +40,9 @@ export async function POST(request: Request) {
   }
 
   try {
+    const user = await requireUser();
     return Response.json(
-      { card: createCardFromInput(parsed.data) },
+      { card: createCardFromInput(user.id, parsed.data) },
       { status: 201 },
     );
   } catch (cause) {

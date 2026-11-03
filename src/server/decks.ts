@@ -34,8 +34,8 @@ export type DeleteDeckResult = {
   deletedCards: number;
 };
 
-export function listDeckViews(): DeckSummary[] {
-  return listDeckSummaries();
+export function listDeckViews(userId: string): DeckSummary[] {
+  return listDeckSummaries(userId);
 }
 
 function requireName(value: unknown): string {
@@ -46,35 +46,39 @@ function requireName(value: unknown): string {
   return result.name;
 }
 
-/** Seeds the default deck when the database has none. Idempotent. */
-export function ensureDefaultDeck(): void {
-  if (countDecks() > 0) {
+/** Seeds the default deck when the user has none. Idempotent. */
+export function ensureDefaultDeck(userId: string): void {
+  if (countDecks(userId) > 0) {
     return;
   }
 
-  createDeck(DEFAULT_DECK_NAME);
+  createDeck(userId, DEFAULT_DECK_NAME);
 }
 
-export function createDeckFromInput(input: unknown): DeckSummary {
+export function createDeckFromInput(
+  userId: string,
+  input: unknown,
+): DeckSummary {
   const name = requireName(
     typeof input === "object" && input !== null && "name" in input
       ? (input as { name: unknown }).name
       : undefined,
   );
 
-  if (findDeckByName(name)) {
+  if (findDeckByName(userId, name)) {
     throw new DeckError("duplicate_name");
   }
 
-  const deck = createDeck(name);
+  const deck = createDeck(userId, name);
   return { ...deck, cardCount: 0 };
 }
 
 export function renameDeckFromInput(
+  userId: string,
   id: string,
   input: unknown,
 ): DeckSummary {
-  if (!getDeckById(id)) {
+  if (!getDeckById(userId, id)) {
     throw new DeckError("not_found");
   }
 
@@ -87,52 +91,58 @@ export function renameDeckFromInput(
   }
 
   const name = requireName((input as { name: unknown }).name);
-  if (findDeckByName(name, id)) {
+  if (findDeckByName(userId, name, id)) {
     throw new DeckError("duplicate_name");
   }
 
-  const updated = renameDeck(id, name);
+  const updated = renameDeck(userId, id, name);
   if (!updated) {
     throw new DeckError("not_found");
   }
 
-  return { ...updated, cardCount: getDeckCardCount(id) };
+  return { ...updated, cardCount: getDeckCardCount(userId, id) };
 }
 
 /**
  * Deletes a deck and every card in it. The last deck cannot be removed: the
  * app always needs a destination for new cards and imports.
  */
-export function removeDeck(id: string): DeleteDeckResult {
-  if (!getDeckById(id)) {
+export function removeDeck(
+  userId: string,
+  id: string,
+): DeleteDeckResult {
+  if (!getDeckById(userId, id)) {
     throw new DeckError("not_found");
   }
 
-  if (countDecks() <= 1) {
+  if (countDecks(userId) <= 1) {
     throw new DeckError("last_deck");
   }
 
-  const deletedCards = getDeckCardCount(id);
-  deleteDeck(id);
+  const deletedCards = getDeckCardCount(userId, id);
+  deleteDeck(userId, id);
   return { deletedCards };
 }
 
 /**
  * Resolves a deck id from an optional input. Missing values fall back to the
- * first deck (creating the default one if the table is empty), which keeps old
- * clients working while the UI always sends an explicit deck.
+ * first deck of the user (creating the default one if the table is empty),
+ * which keeps old clients working while the UI always sends an explicit deck.
  */
-export function resolveDeckId(value: unknown): string {
+export function resolveDeckId(
+  userId: string,
+  value: unknown,
+): string {
   if (typeof value === "string" && value.trim() !== "") {
     const id = value.trim();
-    if (!getDeckById(id)) {
+    if (!getDeckById(userId, id)) {
       throw new DeckError("not_found");
     }
     return id;
   }
 
-  ensureDefaultDeck();
-  const first = listDecks()[0];
+  ensureDefaultDeck(userId);
+  const first = listDecks(userId)[0];
   if (!first) {
     throw new DeckError("not_found");
   }
@@ -141,9 +151,10 @@ export function resolveDeckId(value: unknown): string {
 
 /** Removes deck ids that no longer exist from a config. */
 export function pruneConfigDecks(
+  userId: string,
   config: StudyConfig,
   existingIds: ReadonlySet<string> = new Set(
-    listDecks().map((deck) => deck.id),
+    listDecks(userId).map((deck) => deck.id),
   ),
 ): StudyConfig {
   if (config.deckIds === null) {
