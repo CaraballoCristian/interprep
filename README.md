@@ -103,6 +103,10 @@ Además existe exportación manual CSV/JSON desde la Biblioteca.
 
 Pantalla `/import`: se sube un CSV/TSV o se pega el texto.
 
+- **Mazo de destino**: antes de analizar se elige el mazo (por defecto el
+  primero). Se puede crear uno nuevo con un nombre propio desde la misma
+  pantalla. La vista previa, el conteo de existentes y el commit trabajan
+  **solo** contra ese mazo; reimportar no compara con tarjetas de otros mazos.
 - **Fila de encabezados**: se usa la **primera fila cuyo primer campo sea un
   marcador de numeración** (`Nº`, `n°`, `n.º`, `Nro`, `No.`, `Número`, `#`).
   Las filas por encima se ignoran. Si no hay marcador, se busca la primera fila
@@ -119,22 +123,27 @@ Pantalla `/import`: se sube un CSV/TSV o se pega el texto.
 - La vista previa muestra filas válidas, con error y vacías, el detalle de las
   filas problemáticas y (si ya hay datos) cuántas se actualizan, cuántas son
   nuevas y cuántas se conservan. Las filas con error se saltean.
-- Reimportar hace merge por la clave normalizada `termEng + termEsp`: actualiza
-  categoría, descripción y el texto de los términos, y **conserva** estado,
-  oculta, historial y contadores. Las tarjetas que no están en el archivo se
-  conservan.
+- Reimportar hace merge por la clave normalizada `termEng + termEsp` **dentro
+  del mazo elegido**: actualiza categoría, descripción y el texto de los
+  términos, y **conserva** estado, oculta, historial y contadores. Las tarjetas
+  que no están en el archivo se conservan.
 
 ## Estudio
 
 Pantalla `/` (antes `/study`), mobile-first y usable a 360px:
 
 - La tarjeta se voltea tocándola (o con `Espacio`/`Enter`). **Toda** acción de
-  estado requiere la tarjeta volteada; si no, se muestra «Girá la tarjeta
-  primero». Las flechas mapean `↑` Aprendida (archivar), `↓` Nueva,
-  `→` Fácil y `←` Difícil.
+  estado requiere haber revelado la tarjeta al menos una vez en esa
+  presentación; si no, se muestra «Girá la tarjeta primero». Una vez revelada,
+  las acciones siguen habilitadas aunque se vuelva al lado A. Las flechas
+  mapean `↑` Aprendida (archivar), `↓` Nueva, `→` Fácil y `←` Difícil.
 - **Gestos**: swipe a la derecha = Fácil, a la izquierda = Difícil, arriba =
-  Aprendida, abajo = Nueva. Con la tarjeta sin voltear solo avisan que hay que
+  Aprendida, abajo = Nueva. El overlay muestra un emoji (`✅`, `❌`, `🙈`, `☠`)
+  además de la dirección. Con la tarjeta sin voltear solo avisan que hay que
   girarla. Ocultar tiene su propio botón.
+- **Ayuda**: el botón `?` abre un diálogo con los atajos en desktop y los gestos
+  en mobile. Cada acción de estudio tiene un tooltip i18n; el de ocultar explica
+  que la tarjeta no se borra y cómo recuperarla desde la Biblioteca.
 - **Estado**: la tarjeta muestra categoría/industria y el estado actual. `Fácil`
   y `Difícil` actualizan historial y contadores; `Nueva` y `Aprendida` no.
   `Aprendida` deja de aparecer en el estudio.
@@ -150,9 +159,10 @@ Pantalla `/` (antes `/study`), mobile-first y usable a 360px:
 - **Undo**: permanente y multinivel (hasta 20 acciones). Cada cambio de estado
   u ocultar se puede deshacer y vuelve a la tarjeta afectada. Se limpia al
   iniciar una vuelta, repasar o aplicar filtros.
-- **Atajos de teclado**: `Espacio`/`Enter` voltear, `→`/`2` Fácil,
-  `←`/`1` Difícil, `↑`/`3` Aprendida, `↓`/`4` Nueva, `H` ocultar, `Z` undo. Se
-  centralizan en `src/config/keyboard.ts`.
+- **Atajos de teclado**: `Espacio`/`Enter` voltear, `→` Fácil, `←` Difícil,
+  `↑` Aprendida, `↓` Nueva, `H` ocultar, `Z` undo y `?` ayuda. No hay alias
+  numéricos; los atajos nunca se disparan con Ctrl, Alt o Meta. Se centralizan
+  en `src/config/keyboard.ts`.
 - La sesión se guarda en `session_state` después de cada acción. Al salir no se
   pregunta nada; al volver se ofrece «¿Retomar la sesión actual?». Si se elige
   empezar de cero, se conservan estado, historial y contadores por tarjeta.
@@ -169,9 +179,13 @@ Pantalla `/filters`:
   `Término español`, `Descripción`. Un click en el lado opuesto **mueve** el
   campo (sin desmarcar primero); un click en el lado marcado lo quita. Ambos
   lados necesitan al menos un campo.
-- **Categorías**: se listan dinámicamente desde las tarjetas, con checkboxes y
-  acciones `Todas` / `Ninguna`. `Todas` es dinámico (las categorías nuevas
-  entran solas); `Ninguna` deja el mazo vacío.
+- **Mazos**: checkboxes para elegir uno o varios mazos, con `Todos` /
+  `Ninguno`. `Todos` es dinámico (incluye los mazos que se creen después). Se
+  pueden combinar mazos aunque compartan categorías.
+- **Categorías**: se listan dinámicamente como la **unión** de las categorías
+  de los mazos seleccionados, con checkboxes y acciones `Todas` / `Ninguna`.
+  Al cambiar de mazos se descartan las categorías que ya no aplican. `Todas` es
+  dinámico; `Ninguna` deja el mazo vacío.
 - **Estados**: checkboxes `Nueva / Fácil / Difícil / Aprendida`, con acciones
   `Todas` / `Ninguna`. El default es `Nueva / Fácil / Difícil` (Aprendida es el
   archivo y queda fuera salvo que se marque). Sin estados el mazo queda vacío
@@ -180,11 +194,17 @@ Pantalla `/filters`:
   vuelta en curso, aplicar filtros pide confirmación y empieza de cero.
 - **Aplicar**: guarda la config en la sesión y arranca una vuelta nueva con el
   mazo recalculado.
-- **Templates**: guardan lados, categorías, estados y modo continuo bajo un
-  nombre único (máx. 80). Acciones: guardar la config actual, aplicar, renombrar,
-  sobrescribir y borrar. Guardar, renombrar y sobrescribir **no** aplican el
-  template ni tocan la vuelta en curso; aplicar sí inicia una vuelta nueva y
-  recuerda el template como último usado.
+- **Templates**: guardan lados, mazos, categorías, estados y modo continuo bajo
+  un nombre único (máx. 80). Acciones: guardar la config actual, aplicar,
+  renombrar, sobrescribir y borrar. Guardar, renombrar y sobrescribir **no**
+  aplican el template ni tocan la vuelta en curso; aplicar sí inicia una vuelta
+  nueva y recuerda el template como último usado.
+- **Administrar mazos**: se crean con un nombre propio y se pueden renombrar o
+  borrar. Borrar un mazo pide confirmación mostrando cuántas tarjetas se van a
+  borrar con él (cascada) y no está bloqueado por tener tarjetas. El último mazo
+  no se puede borrar.
+- Todas las confirmaciones destructivas usan un **diálogo propio** accesible,
+  no `window.confirm`.
 - Al abrir la app se retoma la sesión guardada si hay una vuelta en curso; si
   no, se carga el último template usado. En el primer uso existe `Eng → Esp`
   (A: inglés; B: español + descripción).
@@ -197,20 +217,23 @@ API:
   config manual.
 - `GET/POST /api/templates`, `PATCH/DELETE /api/templates/:id`,
   `POST /api/templates/:id/apply`.
+- `GET/POST /api/decks`, `PATCH/DELETE /api/decks/:id`.
 
 ## Biblioteca
 
 Pantalla `/library`:
 
 - **Lista** con búsqueda sin distinguir mayúsculas ni acentos sobre término
-  inglés, término español, categoría y descripción, y filtros por categoría,
-  estado y visibilidad (`Todas / Visibles / Ocultas`). El filtrado se resuelve
-  en el servidor con la misma lógica pura que cubren los tests. En desktop las
-  tarjetas se muestran en dos columnas.
-- **Alta manual** con término inglés y español obligatorios, categoría libre,
-  estado y descripción. El par de términos normalizado es único.
-- **Edición** de todos los campos sin reimportar; conserva estado, historial y
-  contadores. **Borrado** con confirmación.
+  inglés, término español, categoría y descripción, y filtros por mazo,
+  categoría, estado y visibilidad (`Todas / Visibles / Ocultas`). El filtrado se
+  resuelve en el servidor con la misma lógica pura que cubren los tests. En
+  desktop las tarjetas se muestran en dos columnas con altura fija; el texto
+  largo se trunca y solo la tarjeta en edición crece.
+- **Alta manual** con término inglés y español obligatorios, mazo, categoría
+  libre, estado y descripción. El par de términos normalizado es único dentro
+  del mazo.
+- **Edición** de todos los campos (incluido el mazo) sin reimportar; conserva
+  estado, historial y contadores. **Borrado** con diálogo de confirmación.
 - **Ocultas**: se listan con el filtro `Ocultas` y se restauran con `Mostrar`;
   mientras están ocultas siguen excluidas de los mazos.
 - **Exportar** todo como CSV (UTF-8 con BOM para planillas) o JSON
@@ -281,6 +304,7 @@ src/server/         servicios de servidor (importación, estudio, templates,
                     biblioteca, settings)
 drizzle/            migraciones SQL versionadas
 lib/                lógica de dominio pura (sin React ni DB) + tests
+  decks/            tipos y validación de nombres de mazos
   i18n/             diccionario tipado ES/EN e interpolación
   import/           parser CSV/TSV, fila de encabezados, preview y merge
   library/          validación de tarjetas, filtros y export CSV/JSON
@@ -314,3 +338,6 @@ Reglas del proyecto:
       (manifest + service worker), accesibilidad AA y revisión final.
 - [x] **Fase 8** — Navegación por tabs (bottom en mobile, sidebar en desktop) y
       detección de la fila de encabezados por el marcador `Nº`.
+- [x] **Fase 9** — Mazos múltiples (alta, renombrado, borrado en cascada,
+      importación y filtros por mazo), `revealed` para habilitar estados,
+      ayuda/atajos/gestos, tooltips i18n y confirmaciones modales.

@@ -6,6 +6,7 @@ import type { StudyCard } from "./types";
 function card(overrides: Partial<StudyCard> = {}): StudyCard {
   return {
     id: "c1",
+    deckId: "deck-general",
     category: "Insurance",
     termEng: "Policy",
     termEsp: "Póliza",

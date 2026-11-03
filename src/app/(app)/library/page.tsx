@@ -9,8 +9,10 @@ import {
 } from "react";
 import type { HiddenFilter, LibraryFilter } from "@lib/library/filter";
 import type { LibraryCard } from "@lib/library/types";
+import type { DeckSummary } from "@lib/decks/types";
 import type { TranslationKey } from "@lib/i18n/dictionary";
 import { CARD_STATUSES, type CardResult, type CardStatus } from "@lib/types";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PageHeading } from "@/components/page-heading";
 import { useI18n } from "@/components/settings-provider";
 
@@ -28,11 +30,13 @@ const HIDDEN_OPTIONS: { value: HiddenFilter; key: TranslationKey }[] = [
 ];
 
 const ALL_CATEGORIES = "__all__";
+const ALL_DECKS = "__all_decks__";
 
 type LibraryResponse = {
   filter: LibraryFilter;
   cards: LibraryCard[];
   categories: string[];
+  decks: DeckSummary[];
   total: number;
   visible: number;
   hidden: number;
@@ -40,6 +44,7 @@ type LibraryResponse = {
 };
 
 type CardDraft = {
+  deckId: string;
   termEng: string;
   termEsp: string;
   category: string;
@@ -48,6 +53,7 @@ type CardDraft = {
 };
 
 const EMPTY_DRAFT: CardDraft = {
+  deckId: "",
   termEng: "",
   termEsp: "",
   category: "",
@@ -89,6 +95,7 @@ type CardFieldsProps = {
   idPrefix: string;
   draft: CardDraft;
   categories: string[];
+  decks: DeckSummary[];
   disabled: boolean;
   onChange: (patch: Partial<CardDraft>) => void;
 };
@@ -97,6 +104,7 @@ function CardFields({
   idPrefix,
   draft,
   categories,
+  decks,
   disabled,
   onChange,
 }: CardFieldsProps) {
@@ -140,6 +148,28 @@ function CardFields({
           disabled={disabled}
           className={inputClass}
         />
+      </div>
+
+      <div>
+        <label
+          htmlFor={`${idPrefix}-deck`}
+          className="mb-1 block text-sm font-medium"
+        >
+          {t("deck.label")}
+        </label>
+        <select
+          id={`${idPrefix}-deck`}
+          value={draft.deckId}
+          onChange={(event) => onChange({ deckId: event.target.value })}
+          disabled={disabled || decks.length === 0}
+          className={inputClass}
+        >
+          {decks.map((deck) => (
+            <option key={deck.id} value={deck.id}>
+              {deck.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -224,6 +254,7 @@ export default function LibraryPage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
+  const [deckId, setDeckId] = useState<string | null>(null);
   const [category, setCategory] = useState<string | null>(null);
   const [status, setStatus] = useState<CardStatus | null>(null);
   const [hidden, setHidden] = useState<HiddenFilter>("all");
@@ -233,6 +264,7 @@ export default function LibraryPage() {
   const [createDraft, setCreateDraft] = useState<CardDraft>(EMPTY_DRAFT);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<CardDraft>(EMPTY_DRAFT);
+  const [pendingDelete, setPendingDelete] = useState<LibraryCard | null>(null);
 
   function readError(body: unknown): string {
     const code =
@@ -245,6 +277,8 @@ export default function LibraryPage() {
         return t("library.error.termsRequired");
       case "duplicate_card":
         return t("library.error.duplicate");
+      case "deck_not_found":
+        return t("deck.error.notFound");
       case "invalid_status":
         return t("library.error.invalidStatus");
       case "invalid_hidden":
@@ -270,6 +304,9 @@ export default function LibraryPage() {
       if (search.trim() !== "") {
         params.set("search", search.trim());
       }
+      if (deckId !== null) {
+        params.set("deck", deckId);
+      }
       if (category !== null) {
         params.set("category", category);
       }
@@ -290,6 +327,12 @@ export default function LibraryPage() {
             throw new Error(readError(body));
           }
           setData(body as LibraryResponse);
+          const view = body as LibraryResponse;
+          setCategory((current) =>
+            current !== null && !view.categories.includes(current)
+              ? null
+              : current,
+          );
           setError(null);
         })
         .catch((cause: unknown) => {
@@ -312,7 +355,7 @@ export default function LibraryPage() {
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, category, status, hidden, refreshKey]);
+  }, [search, deckId, category, status, hidden, refreshKey]);
 
   const refresh = () => setRefreshKey((key) => key + 1);
 
@@ -338,6 +381,7 @@ export default function LibraryPage() {
 
   function clearFilters() {
     setSearch("");
+    setDeckId(null);
     setCategory(null);
     setStatus(null);
     setHidden("all");
@@ -345,7 +389,10 @@ export default function LibraryPage() {
 
   function startCreate() {
     setCreating(true);
-    setCreateDraft(EMPTY_DRAFT);
+    setCreateDraft({
+      ...EMPTY_DRAFT,
+      deckId: deckId ?? data?.decks[0]?.id ?? "",
+    });
     setEditingId(null);
     setError(null);
     setNotice(null);
@@ -380,6 +427,7 @@ export default function LibraryPage() {
   function startEdit(card: LibraryCard) {
     setEditingId(card.id);
     setEditDraft({
+      deckId: card.deckId,
       termEng: card.termEng,
       termEsp: card.termEsp,
       category: card.category,
@@ -444,17 +492,17 @@ export default function LibraryPage() {
     });
   }
 
-  function removeCard(card: LibraryCard) {
-    if (
-      !window.confirm(
-        t("library.confirm.delete", {
-          termEng: card.termEng,
-          termEsp: card.termEsp,
-        }),
-      )
-    ) {
+  function requestRemoveCard(card: LibraryCard) {
+    setPendingDelete(card);
+  }
+
+  function confirmRemoveCard() {
+    const card = pendingDelete;
+    if (!card) {
       return;
     }
+
+    setPendingDelete(null);
 
     void run(async () => {
       const response = await fetch(`/api/cards/${card.id}`, {
@@ -475,6 +523,12 @@ export default function LibraryPage() {
   }
 
   const categories = data?.categories ?? [];
+  const decks = data?.decks ?? [];
+
+  const deckNames = useMemo(
+    () => new Map(decks.map((deck) => [deck.id, deck.name])),
+    [decks],
+  );
 
   const categoryOptions = useMemo(() => {
     if (category !== null && !categories.includes(category)) {
@@ -485,6 +539,7 @@ export default function LibraryPage() {
 
   const hasFilters =
     search.trim() !== "" ||
+    deckId !== null ||
     category !== null ||
     status !== null ||
     hidden !== "all";
@@ -579,6 +634,34 @@ export default function LibraryPage() {
               autoComplete="off"
               className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
             />
+          </div>
+
+          <div>
+            <label
+              htmlFor="library-deck"
+              className="mb-1 block text-sm font-medium"
+            >
+              {t("library.deckLabel")}
+            </label>
+            <select
+              id="library-deck"
+              value={deckId === null ? ALL_DECKS : deckId}
+              onChange={(event) =>
+                setDeckId(
+                  event.target.value === ALL_DECKS
+                    ? null
+                    : event.target.value,
+                )
+              }
+              className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
+            >
+              <option value={ALL_DECKS}>{t("library.allDecks")}</option>
+              {decks.map((deck) => (
+                <option key={deck.id} value={deck.id}>
+                  {deck.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -713,6 +796,7 @@ export default function LibraryPage() {
                 idPrefix="create"
                 draft={createDraft}
                 categories={categories}
+                decks={decks}
                 disabled={busy}
                 onChange={(patch) =>
                   setCreateDraft((current) => ({ ...current, ...patch }))
@@ -783,59 +867,77 @@ export default function LibraryPage() {
               return (
                 <li
                   key={card.id}
-                  className="space-y-3 rounded-2xl border border-border bg-surface p-4"
+                  className={`flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4 ${
+                    editing ? "min-h-[22rem]" : "h-[22rem] overflow-hidden"
+                  }`}
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="break-words text-lg font-semibold">
-                        {card.termEng}
-                      </p>
-                      <p className="break-words text-sm text-muted">
-                        {card.termEsp}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-end gap-1">
-                      <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-xs font-medium">
-                        {t(STATUS_KEYS[card.status])}
-                      </span>
-                      {card.hidden && (
-                        <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">
-                          {t("library.hiddenBadge")}
+                  <div className="min-h-0 flex-1 space-y-3 overflow-hidden">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className="line-clamp-2 break-words text-lg font-semibold"
+                          title={card.termEng}
+                        >
+                          {card.termEng}
+                        </p>
+                        <p
+                          className="line-clamp-1 break-words text-sm text-muted"
+                          title={card.termEsp}
+                        >
+                          {card.termEsp}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-end gap-1">
+                        <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+                          {deckNames.get(card.deckId) ?? t("deck.label")}
                         </span>
-                      )}
+                        <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-xs font-medium">
+                          {t(STATUS_KEYS[card.status])}
+                        </span>
+                        {card.hidden && (
+                          <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">
+                            {t("library.hiddenBadge")}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {card.description !== "" && (
-                    <p className="whitespace-pre-wrap break-words text-sm">
-                      {card.description}
-                    </p>
-                  )}
-
-                  <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-                    <dt className="text-muted">{t("library.category")}</dt>
-                    <dd>{categoryLabel(card.category, t)}</dd>
-                    <dt className="text-muted">{t("library.history")}</dt>
-                    <dd>
-                      <span
-                        title={card.history
-                          .map((result) => (result === "s" ? "✓" : "✕"))
-                          .join(" ")}
+                    {card.description !== "" && (
+                      <p
+                        className="line-clamp-3 whitespace-pre-wrap break-words text-sm"
+                        title={card.description}
                       >
-                        {historyText(card.history, t)}
-                      </span>
-                    </dd>
-                    <dt className="text-muted">{t("library.counters")}</dt>
-                    <dd>
-                      <span className="text-success">
-                        ✓ {card.totalSuccess}
-                      </span>
-                      <span className="mx-1 text-muted">·</span>
-                      <span className="text-danger">
-                        ✕ {card.totalFail}
-                      </span>
-                    </dd>
-                  </dl>
+                        {card.description}
+                      </p>
+                    )}
+
+                    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                      <dt className="text-muted">{t("library.category")}</dt>
+                      <dd className="truncate" title={categoryLabel(card.category, t)}>
+                        {categoryLabel(card.category, t)}
+                      </dd>
+                      <dt className="text-muted">{t("library.history")}</dt>
+                      <dd>
+                        <span
+                          title={card.history
+                            .map((result) => (result === "s" ? "✓" : "✕"))
+                            .join(" ")}
+                        >
+                          {historyText(card.history, t)}
+                        </span>
+                      </dd>
+                      <dt className="text-muted">{t("library.counters")}</dt>
+                      <dd>
+                        <span className="text-success">
+                          ✓ {card.totalSuccess}
+                        </span>
+                        <span className="mx-1 text-muted">·</span>
+                        <span className="text-danger">
+                          ✕ {card.totalFail}
+                        </span>
+                      </dd>
+                    </dl>
+                  </div>
 
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -856,7 +958,7 @@ export default function LibraryPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => removeCard(card)}
+                      onClick={() => requestRemoveCard(card)}
                       disabled={busy}
                       className="min-h-12 flex-1 rounded-xl border border-danger/40 px-3 text-sm font-medium text-danger disabled:opacity-50"
                     >
@@ -873,6 +975,7 @@ export default function LibraryPage() {
                         idPrefix={`edit-${card.id}`}
                         draft={editDraft}
                         categories={categories}
+                        decks={decks}
                         disabled={busy}
                         onChange={(patch) =>
                           setEditDraft((current) => ({
@@ -906,6 +1009,23 @@ export default function LibraryPage() {
           </ul>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={t("library.confirm.deleteTitle")}
+        description={
+          pendingDelete
+            ? t("library.confirm.delete", {
+                termEng: pendingDelete.termEng,
+                termEsp: pendingDelete.termEsp,
+              })
+            : undefined
+        }
+        confirmLabel={t("library.delete")}
+        tone="danger"
+        onConfirm={confirmRemoveCard}
+        onCancel={() => setPendingDelete(null)}
+      />
     </main>
   );
 }

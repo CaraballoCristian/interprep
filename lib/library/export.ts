@@ -2,6 +2,7 @@ import type { LibraryCard } from "./types";
 
 const CSV_COLUMNS = [
   "Id",
+  "Deck",
   "English",
   "Spanish",
   "Category",
@@ -25,14 +26,25 @@ export function escapeCsv(value: string): string {
   return value;
 }
 
+function deckNameOf(
+  deckNames: ReadonlyMap<string, string> | undefined,
+  deckId: string,
+): string {
+  return deckNames?.get(deckId) ?? "";
+}
+
 /** Full backup: includes hidden cards, history and counters. */
-export function exportCardsCsv(cards: readonly LibraryCard[]): string {
+export function exportCardsCsv(
+  cards: readonly LibraryCard[],
+  deckNames?: ReadonlyMap<string, string>,
+): string {
   const lines = [CSV_EXPORT_HEADER];
 
   for (const card of cards) {
     lines.push(
       [
         card.id,
+        deckNameOf(deckNames, card.deckId),
         card.termEng,
         card.termEsp,
         card.category,
@@ -56,12 +68,16 @@ export function exportCardsCsv(cards: readonly LibraryCard[]): string {
 export function exportCardsJson(
   cards: readonly LibraryCard[],
   exportedAt = new Date().toISOString(),
+  deckNames?: ReadonlyMap<string, string>,
 ): string {
   return JSON.stringify(
     {
       version: 1,
       exportedAt,
-      cards,
+      cards: cards.map((card) => ({
+        ...card,
+        deckName: deckNameOf(deckNames, card.deckId),
+      })),
     },
     null,
     2,

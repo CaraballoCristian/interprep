@@ -68,6 +68,36 @@ export function sanitizeStatuses(value: unknown): CardStatus[] {
 }
 
 /**
+ * `null`/missing means "all decks" (dynamic, including future decks). An
+ * explicit empty array means "no decks".
+ */
+export function sanitizeDeckIds(value: unknown): string[] | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const deckIds: string[] = [];
+
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+
+    const deckId = item.trim();
+    if (deckId !== "" && !seen.has(deckId)) {
+      seen.add(deckId);
+      deckIds.push(deckId);
+    }
+  }
+
+  return deckIds;
+}
+
+/**
  * `null`/missing means "all categories" (dynamic). An explicit empty array
  * means "no categories". Empty strings are kept because a card may have no
  * category; the UI labels them as "Sin categoría".
@@ -106,6 +136,7 @@ export function normalizeConfig(value: unknown): StudyConfig {
     sideA: sanitizeSide(input.sideA),
     sideB: sanitizeSide(input.sideB),
     categories: sanitizeCategories(input.categories),
+    deckIds: sanitizeDeckIds(input.deckIds),
     statuses: sanitizeStatuses(input.statuses),
     continuous: input.continuous === true,
   };

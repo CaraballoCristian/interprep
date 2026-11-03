@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ChangeEvent } from "react";
+import {
+  useEffect,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
+import type { DeckSummary } from "@lib/decks/types";
 import type {
   ImportCommitResponse,
   ImportPreviewResponse,
@@ -47,6 +53,71 @@ export default function ImportPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportCommitResponse | null>(null);
+  const [resultDeckName, setResultDeckName] = useState<string | null>(null);
+
+  const [decks, setDecks] = useState<DeckSummary[]>([]);
+  const [decksLoading, setDecksLoading] = useState(true);
+  const [deckId, setDeckId] = useState("");
+  const [deckName, setDeckName] = useState("");
+  const [creatingDeck, setCreatingDeck] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDecks() {
+      try {
+        const response = await fetch("/api/decks", { cache: "no-store" });
+        const body = (await response.json().catch(() => null)) as {
+          decks?: DeckSummary[];
+          error?: string;
+        } | null;
+
+        if (!response.ok) {
+          throw new Error(deckError(body?.error));
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        const list = body?.decks ?? [];
+        setDecks(list);
+        setDeckId((current) => current || list[0]?.id || "");
+      } catch (cause) {
+        if (!cancelled) {
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : t("deck.error.generic"),
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setDecksLoading(false);
+        }
+      }
+    }
+
+    void loadDecks();
+    return () => {
+      cancelled = true;
+    };
+  }, [t]);
+
+  function deckError(code: string | undefined): string {
+    switch (code) {
+      case "invalid_name":
+        return t("deck.error.invalidName");
+      case "duplicate_name":
+        return t("deck.error.duplicateName");
+      case "not_found":
+        return t("deck.error.notFound");
+      case "last_deck":
+        return t("deck.error.last");
+      default:
+        return t("deck.error.generic");
+    }
+  }
 
   async function readError(response: Response): Promise<string> {
     try {
@@ -58,6 +129,11 @@ export default function ImportPage() {
           return t("import.error.noValidRows");
         case "invalid_input":
           return t("import.error.invalidInput");
+        case "duplicate_name":
+        case "invalid_name":
+        case "not_found":
+        case "last_deck":
+          return deckError(data.error);
         default:
           return t("import.error.unexpected");
       }
@@ -69,9 +145,16 @@ export default function ImportPage() {
   async function analyze(options?: {
     mapping?: ColumnMapping;
     headerRow?: number;
+    deckId?: string;
   }) {
     if (!content.trim()) {
       setError(t("import.error.pasteFirst"));
+      return;
+    }
+
+    const targetDeck = options?.deckId ?? deckId;
+    if (targetDeck === "") {
+      setError(t("deck.error.notFound"));
       return;
     }
 
@@ -87,6 +170,7 @@ export default function ImportPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
+          deckId: targetDeck,
           ...(options?.mapping ? { mapping: options.mapping } : {}),
           ...(headerRow ? { headerRow } : {}),
         }),
@@ -112,7 +196,7 @@ export default function ImportPage() {
   }
 
   async function commit() {
-    if (!mapping) {
+    if (!mapping || deckId === "") {
       return;
     }
 
@@ -125,6 +209,7 @@ export default function ImportPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
+          deckId,
           mapping,
           ...(preview ? { headerRow: preview.headerRow } : {}),
         }),
@@ -135,6 +220,9 @@ export default function ImportPage() {
       }
 
       const data = (await response.json()) as ImportCommitResponse;
+      setResultDeckName(
+        decks.find((deck) => deck.id === deckId)?.name ?? null,
+      );
       setResult(data);
       setPreview(null);
       setMapping(null);
@@ -173,7 +261,60 @@ export default function ImportPage() {
     setMapping(null);
     setHeaderRowInput("");
     setResult(null);
+    setResultDeckName(null);
     setError(null);
+  }
+
+  function onDeckChange(value: string) {
+    setDeckId(value);
+    setResult(null);
+    setResultDeckName(null);
+    setError(null);
+
+    if (preview) {
+      void analyze({
+        deckId: value,
+        ...(mapping ? { mapping } : {}),
+        headerRow: preview.headerRow,
+      });
+    }
+  }
+
+  async function createDeck(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (deckName.trim() === "" || creatingDeck) {
+      return;
+    }
+
+    setCreatingDeck(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/decks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: deckName }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        deck?: DeckSummary;
+        error?: string;
+      } | null;
+
+      if (!response.ok || !body?.deck) {
+        throw new Error(deckError(body?.error));
+      }
+
+      const created = body.deck;
+      setDecks((current) => [...current, created]);
+      setDeckName("");
+      onDeckChange(created.id);
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : t("deck.error.generic"),
+      );
+    } finally {
+      setCreatingDeck(false);
+    }
   }
 
   function onMappingChange(field: ImportField, value: string) {
@@ -195,6 +336,7 @@ export default function ImportPage() {
 
   const canCommit =
     !busy &&
+    deckId !== "" &&
     preview !== null &&
     preview.plan !== null &&
     preview.plan.validRows > 0 &&
@@ -211,7 +353,9 @@ export default function ImportPage() {
           <div>
             <h2 className="text-lg font-semibold">{t("import.doneTitle")}</h2>
             <p className="mt-1 text-sm text-muted">
-              {t("import.doneDescription")}
+              {resultDeckName
+                ? t("import.doneDeck", { name: resultDeckName })
+                : t("import.doneDescription")}
             </p>
           </div>
 
@@ -258,6 +402,55 @@ export default function ImportPage() {
       ) : (
         <>
           <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
+            <div>
+              <h2 className="text-lg font-semibold">
+                {t("import.deckLabel")}
+              </h2>
+              <p className="mt-1 text-sm text-muted">{t("import.deckHint")}</p>
+            </div>
+
+            <label htmlFor="import-deck" className="sr-only">
+              {t("import.deckLabel")}
+            </label>
+            <select
+              id="import-deck"
+              value={deckId}
+              onChange={(event) => onDeckChange(event.target.value)}
+              disabled={busy || decksLoading || decks.length === 0}
+              className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-accent disabled:opacity-50"
+            >
+              {decks.map((deck) => (
+                <option key={deck.id} value={deck.id}>
+                  {deck.name}
+                </option>
+              ))}
+            </select>
+
+            <form onSubmit={createDeck} className="flex flex-wrap gap-2">
+              <label htmlFor="import-deck-name" className="sr-only">
+                {t("deck.nameLabel")}
+              </label>
+              <input
+                id="import-deck-name"
+                value={deckName}
+                onChange={(event) => setDeckName(event.target.value)}
+                maxLength={80}
+                placeholder={t("deck.namePlaceholder")}
+                className="min-h-12 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-accent"
+              />
+              <button
+                type="submit"
+                disabled={
+                  creatingDeck || deckName.trim() === "" || decksLoading
+                }
+                className="min-h-12 rounded-xl border border-border px-4 text-sm font-semibold disabled:opacity-50"
+              >
+                {t("deck.create")}
+              </button>
+            </form>
+          </section>
+
+          <section className="mt-4 space-y-3 rounded-2xl border border-border bg-surface p-4">
             <label
               htmlFor="import-content"
               className="block text-sm font-medium"
@@ -300,7 +493,7 @@ export default function ImportPage() {
             <button
               type="button"
               onClick={() => void analyze()}
-              disabled={busy || content.trim() === ""}
+              disabled={busy || deckId === "" || content.trim() === ""}
               className="min-h-12 w-full rounded-xl bg-accent px-5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
             >
               {busy && !preview ? t("import.analyzing") : t("import.analyze")}

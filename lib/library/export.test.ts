@@ -9,6 +9,7 @@ import type { LibraryCard } from "./types";
 
 const card: LibraryCard = {
   id: "card-1",
+  deckId: "deck-general",
   termEng: "Policy",
   termEsp: "Póliza",
   category: "Insurance",
@@ -55,6 +56,7 @@ describe("exportCardsCsv", () => {
     expect(row).toBe(
       [
         "card-1",
+        "",
         "Policy",
         "Póliza",
         "Insurance",
@@ -68,6 +70,16 @@ describe("exportCardsCsv", () => {
         "2026-01-02T00:00:00.000Z",
       ].join(","),
     );
+  });
+
+  it("exports the deck name when a map is provided", () => {
+    const csv = exportCardsCsv(
+      [card],
+      new Map([["deck-general", "General"]]),
+    );
+    const [, row] = csv.trimEnd().split("\r\n");
+
+    expect(row.split(",")[1]).toBe("General");
   });
 
   it("keeps a trailing newline and CRLF rows", () => {
@@ -96,8 +108,20 @@ describe("exportCardsJson", () => {
     expect(parsed).toEqual({
       version: 1,
       exportedAt,
-      cards: [card],
+      cards: [{ ...card, deckName: "" }],
     });
+  });
+
+  it("adds the deck name to each exported card", () => {
+    const parsed = JSON.parse(
+      exportCardsJson(
+        [card],
+        "2026-10-31T12:00:00.000Z",
+        new Map([["deck-general", "General"]]),
+      ),
+    ) as unknown as { cards: Array<LibraryCard & { deckName: string }> };
+
+    expect(parsed.cards[0].deckName).toBe("General");
   });
 
   it("exports an empty list", () => {

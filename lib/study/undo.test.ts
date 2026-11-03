@@ -13,6 +13,7 @@ import {
 function card(overrides: Partial<StudyCard> = {}): StudyCard {
   return {
     id: "c1",
+    deckId: "deck-general",
     category: "Insurance",
     termEng: "Policy",
     termEsp: "Póliza",
@@ -58,11 +59,19 @@ describe("createUndoEntry", () => {
 });
 
 describe("createSessionUndo", () => {
-  it("stores a clone of the round and the flip state", () => {
+  it("stores a clone of the round, the flip state and revealed", () => {
     const current = round();
-    const undo = createSessionUndo("status", card(), current, true, 5_000);
+    const undo = createSessionUndo(
+      "status",
+      card(),
+      current,
+      true,
+      true,
+      5_000,
+    );
 
     expect(undo.flipped).toBe(true);
+    expect(undo.revealed).toBe(true);
     expect(undo.round).not.toBe(current);
     expect(undo.round.deck).toEqual(current.deck);
 
@@ -78,7 +87,7 @@ describe("pushUndo", () => {
     for (let index = 0; index < UNDO_LIMIT + 5; index += 1) {
       stack = pushUndo(
         stack,
-        createSessionUndo("status", card(), round(), false, index),
+        createSessionUndo("status", card(), round(), false, false, index),
       );
     }
 
@@ -95,7 +104,7 @@ describe("undoAvailable", () => {
   it("is true when there is at least one entry", () => {
     const stack = pushUndo(
       [],
-      createSessionUndo("status", card(), round(), false, 1_000),
+      createSessionUndo("status", card(), round(), false, false, 1_000),
     );
     expect(undoAvailable(stack)).toBe(true);
   });

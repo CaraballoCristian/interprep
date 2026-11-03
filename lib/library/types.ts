@@ -3,6 +3,7 @@ import type { CardResult, CardStatus } from "../types";
 /** Card shape used by the library and by the export helpers. */
 export type LibraryCard = {
   id: string;
+  deckId: string;
   termEng: string;
   termEsp: string;
   category: string;

@@ -2,6 +2,7 @@ import type { CardResult, CardStatus, SideField } from "../types";
 
 export type StudyCard = {
   id: string;
+  deckId: string;
   category: string;
   termEng: string;
   termEsp: string;
@@ -18,6 +19,8 @@ export type StudyConfig = {
   sideB: SideField[];
   /** null means "all categories". */
   categories: string[] | null;
+  /** null means "all decks", including decks created later. */
+  deckIds: string[] | null;
   statuses: CardStatus[];
   /**
    * Continuous rounds keep repeating HARD/NEW cards until every card is

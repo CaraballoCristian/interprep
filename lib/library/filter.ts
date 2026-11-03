@@ -6,6 +6,8 @@ export type HiddenFilter = "all" | "visible" | "hidden";
 
 export type LibraryFilter = {
   search: string;
+  /** null means all decks. */
+  deckId: string | null;
   /** null means all categories. The empty string is a valid category. */
   category: string | null;
   /** null means all statuses. */
@@ -15,6 +17,7 @@ export type LibraryFilter = {
 
 export const DEFAULT_LIBRARY_FILTER: LibraryFilter = {
   search: "",
+  deckId: null,
   category: null,
   status: null,
   hidden: "all",
@@ -36,6 +39,7 @@ export function normalizeLibraryFilter(
 
   return {
     search: typeof input.search === "string" ? input.search.trim() : "",
+    deckId: typeof input.deckId === "string" ? input.deckId : null,
     category: typeof input.category === "string" ? input.category : null,
     status,
     hidden,
@@ -46,6 +50,10 @@ export function matchesLibraryFilter(
   card: LibraryCard,
   filter: LibraryFilter,
 ): boolean {
+  if (filter.deckId !== null && card.deckId !== filter.deckId) {
+    return false;
+  }
+
   if (filter.category !== null && card.category !== filter.category) {
     return false;
   }

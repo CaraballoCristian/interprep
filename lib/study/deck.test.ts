@@ -6,6 +6,7 @@ import type { StudyCard } from "./types";
 function card(overrides: Partial<StudyCard> = {}): StudyCard {
   return {
     id: "c1",
+    deckId: "deck-general",
     category: "Insurance",
     termEng: "Policy",
     termEsp: "Póliza",
@@ -40,6 +41,7 @@ describe("buildDeck", () => {
   it("excludes hidden cards", () => {
     const deck = buildDeck(cards, {
       categories: null,
+      deckIds: null,
       statuses: ["new", "hard", "learned"],
     });
     expect(deck.map((entry) => entry.id)).toEqual(["a", "b", "c"]);
@@ -48,6 +50,7 @@ describe("buildDeck", () => {
   it("filters by status", () => {
     const deck = buildDeck(cards, {
       categories: null,
+      deckIds: null,
       statuses: ["new"],
     });
     expect(deck.map((entry) => entry.id)).toEqual(["a"]);
@@ -56,14 +59,47 @@ describe("buildDeck", () => {
   it("filters by category", () => {
     const deck = buildDeck(cards, {
       categories: ["Court"],
+      deckIds: null,
       statuses: ["new", "hard", "learned"],
     });
     expect(deck.map((entry) => entry.id)).toEqual(["b"]);
   });
 
+  it("filters by deck", () => {
+    const withDecks = [
+      card({ id: "general", deckId: "deck-general" }),
+      card({ id: "legal", deckId: "deck-legal" }),
+    ];
+
+    expect(
+      buildDeck(withDecks, {
+        categories: null,
+        deckIds: ["deck-legal"],
+        statuses: ["new"],
+      }).map((entry) => entry.id),
+    ).toEqual(["legal"]);
+  });
+
+  it("combines multiple decks", () => {
+    const withDecks = [
+      card({ id: "general", deckId: "deck-general" }),
+      card({ id: "legal", deckId: "deck-legal" }),
+      card({ id: "other", deckId: "deck-other" }),
+    ];
+
+    expect(
+      buildDeck(withDecks, {
+        categories: null,
+        deckIds: ["deck-general", "deck-legal"],
+        statuses: ["new"],
+      }).map((entry) => entry.id),
+    ).toEqual(["general", "legal"]);
+  });
+
   it("treats null categories as all categories", () => {
     const deck = buildDeck(cards, {
       categories: null,
+      deckIds: null,
       statuses: ["hard"],
     });
     expect(deck.map((entry) => entry.id)).toEqual(["b"]);
@@ -71,7 +107,11 @@ describe("buildDeck", () => {
 
   it("returns an empty deck when nothing matches", () => {
     expect(
-      buildDeck(cards, { categories: ["Medical"], statuses: ["new"] }),
+      buildDeck(cards, {
+        categories: ["Medical"],
+        deckIds: null,
+        statuses: ["new"],
+      }),
     ).toEqual([]);
   });
 });

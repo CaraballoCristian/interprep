@@ -46,10 +46,21 @@ App web para estudiar terminología específica de interpretación (Insurance, 9
 
 ## 3. Modelo de datos
 
+### `decks`
+| campo | tipo | notas |
+|---|---|---|
+| id | text (uuid) | PK |
+| name | text | libre, único, 1–80 caracteres |
+| createdAt / updatedAt | text ISO | |
+
+Migración inicial: se siembra el mazo `deck-general` con nombre `General` y se
+asignan ahí todas las tarjetas existentes. El último mazo no se puede borrar.
+
 ### `cards`
 | campo | tipo | notas |
 |---|---|---|
 | id | text (uuid) | PK |
+| deckId | text | FK a `decks`, `ON DELETE CASCADE` |
 | category | text | viene de la columna del Sheet; texto libre |
 | termEng | text | requerido |
 | termEsp | text | requerido |
@@ -61,7 +72,9 @@ App web para estudiar terminología específica de interpretación (Insurance, 9
 | totalFail | integer | contador acumulado |
 | createdAt / updatedAt | text ISO | |
 
-Índice único lógico de matching: `normalize(termEng) + normalize(termEsp)` (trim, minúsculas, sin acentos, espacios colapsados).
+Índice único lógico de matching: `normalize(termEng) + normalize(termEsp)`
+(trim, minúsculas, sin acentos, espacios colapsados) **por mazo**: la misma
+tarjeta puede existir en dos mazos distintos.
 
 ### `templates`
 | campo | tipo | notas |
@@ -70,6 +83,7 @@ App web para estudiar terminología específica de interpretación (Insurance, 9
 | name | text | libre, único |
 | sideA | json | array no vacío de `"termEng"` \| `"termEsp"` \| `"description"` |
 | sideB | json | array no vacío, sin solapar con sideA |
+| deckIds | json \| null | `null` = todos los mazos (incluidos los futuros); `[]` = ninguno |
 | categories | json \| null | `null` = todas |
 | statuses | json | subset de `new/easy/hard/learned`; default `new/easy/hard` |
 | continuous | boolean | la vuelta no termina hasta que todo quede `easy` o `learned`; default false |
@@ -79,7 +93,14 @@ App web para estudiar terminología específica de interpretación (Insurance, 9
 `theme` (`dark`|`light`, default `dark`), `language` (`es`|`en`), `lastTemplateId`.
 
 ### `session_state` (un solo registro)
-Estado de la vuelta en curso, serializado: config activa (lados, categorías, estados, modo continuo), cola de tarjetas, repeticiones pendientes (`new` 5–10 respuestas; `hard` 20–30 en continuo), respuestas y estado final por tarjeta, contadores de la sesión, si la tarjeta está volteada, pila de undo (máx. 20) y si corresponde ofrecer retomar la sesión. Se guarda tras cada acción.
+Estado de la vuelta en curso, serializado: config activa (lados, mazos,
+categorías, estados, modo continuo), cola de tarjetas, repeticiones pendientes
+(`new` 5–10 respuestas; `hard` 20–30 en continuo), respuestas y estado final por
+tarjeta, contadores de la sesión, si la tarjeta está volteada, `revealed` (si ya
+se mostró el lado B en la presentación actual), pila de undo (máx. 20) y si
+corresponde ofrecer retomar la sesión. Se guarda tras cada acción. Las sesiones
+viejas sin `revealed` se normalizan como `revealed = flipped`; las que no tienen
+`deckIds` se normalizan como "todos los mazos".
 
 ---
 
@@ -87,6 +108,9 @@ Estado de la vuelta en curso, serializado: config activa (lados, categorías, es
 
 No hay "sincronización" con el Sheet ni modal de sync. Existe una pantalla de **Importar** (CSV/TSV subido o pegado).
 
+0. **Mazo de destino**: se elige antes de analizar y se puede crear uno nuevo
+   con nombre propio. La vista previa, el conteo de existentes y el commit
+   trabajan solo contra ese mazo.
 1. **Detección de encabezados**: mapear por **nombre de columna**, no por posición. Aliases (sin distinguir mayúsculas ni acentos):
    - categoría: `categoría`, `category`, `industria`, `industry`
    - inglés: `inglés`, `ingles`, `english`, `term eng`, `término inglés`
@@ -95,8 +119,8 @@ No hay "sincronización" con el Sheet ni modal de sync. Existe una pantalla de *
 2. Si algún encabezado requerido no se reconoce: mostrar un **selector por columna** para asignarlo manualmente.
 3. **Estado**: la columna `estado`/`status` del Sheet **se ignora**. Toda tarjeta nueva entra como `new`; las existentes conservan su estado.
 4. **Vista previa** antes de confirmar: primeras filas ya interpretadas, conteo de filas válidas / con error / vacías, y detalle de las filas con problema (campo requerido vacío). Las filas con error se **saltean** (no bloquean el import).
-5. **Reimportar**: si ya hay datos, se puede importar de nuevo con una advertencia clara. Para cada fila:
-   - **Coincide** (por la clave normalizada de `termEng + termEsp`) → se actualizan `category` y `description` (y el texto de los términos); se **conservan** `status`, `hidden`, `history` y contadores.
+5. **Reimportar**: si ya hay datos en el mazo elegido, se puede importar de nuevo con una advertencia clara. Para cada fila:
+   - **Coincide** (por la clave normalizada de `termEng + termEsp` **dentro del mazo**) → se actualizan `category` y `description` (y el texto de los términos); se **conservan** `status`, `hidden`, `history` y contadores.
    - **No coincide** → se inserta como tarjeta nueva con estado `new`.
    - Tarjetas que existen en la app pero **no vienen** en el archivo → **se conservan** (no se borran).
 6. La vista previa del reimport muestra cuántas se actualizan, cuántas son nuevas y cuántas se conservan sin cambios.
@@ -116,12 +140,20 @@ No hay "sincronización" con el Sheet ni modal de sync. Existe una pantalla de *
 - Ambos lados deben tener al menos un campo.
 - Cada tarjeta se muestra **primero solo con el lado A**. Al hacer **click (desktop) o tocar (mobile)** la tarjeta, se revela el **lado B** (volteo con animación; el lado B reemplaza al A). Otro tap vuelve al lado A. En desktop, `Espacio`/`Enter` hace lo mismo.
 - Mientras se ve solo el lado A, el contenido del lado B **no** debe estar visible ni accesible en pantalla.
+- **Revelado (`revealed`)**: apenas se muestra el lado B por primera vez en esa
+  presentación, la tarjeta queda revelada. Volver al lado A **no** vuelve a
+  bloquear las acciones de estado. El flag se resetea al pasar a otra tarjeta y
+  al iniciar una vuelta, y undo lo restaura junto con `flipped`.
 
 ✔ Al aparecer una tarjeta nueva siempre se ve el lado A.
 ✔ Un tap/click muestra el lado B; otro vuelve al A.
+✔ Si se revela, se vuelve al lado A y se intenta evaluar, la acción se permite.
 
 ### 5.2 Mazo
-Una tarjeta entra al mazo si cumple **todo**: `hidden = false`, su `status` está en los estados seleccionados, su `category` está en las categorías seleccionadas (o "todas").
+Una tarjeta entra al mazo si cumple **todo**: `hidden = false`, su `deckId`
+está en los mazos seleccionados (o "todos"), su `status` está en los estados
+seleccionados y su `category` está en las categorías seleccionadas (o "todas").
+Al combinar mazos, las categorías disponibles son la unión de sus categorías.
 
 ### 5.3 Vuelta (round)
 - **Vuelta estándar**: recorre todas las tarjetas del mazo una vez. `Nueva` se reprograma a las 5–10 respuestas; `Difícil` no se repite.
@@ -141,14 +173,16 @@ Orden **aleatorio ponderado**, calculado al inicio de la vuelta:
 
 ### 5.5 Evaluación
 - **Fácil** / **Difícil**: se agrega `"s"`/`"f"` al `history` (si pasa de 10, se descarta el más antiguo), se incrementa el contador total correspondiente y se pasa a la siguiente tarjeta. `Nueva` y `Aprendida` no tocan history ni contadores.
-- Las acciones de estado se registran **solo** con la tarjeta volteada; si no, se muestra «Girá la tarjeta primero».
+- Las acciones de estado se registran **solo** si la tarjeta fue revelada en
+  esa presentación; si no, se muestra «Girá la tarjeta primero». El servidor
+  también lo valida (`not_revealed`), no solo la UI.
 - La tarjeta muestra el historial visual (ej. `✓ ✓ ✕ ✓`) con **íconos**, no solo color, y también categoría/industria y estado actual.
 
 ### 5.6 Estado, ocultar y Undo
 - **Cambio de estado**: flechas en la tarjeta (`↑` Aprendida, `↓` Nueva, `→` Fácil, `←` Difícil) más swipe en la misma dirección. Se persiste **inmediatamente**, sin modales. El estado **nunca** cambia solo ni se sugiere.
 - `Aprendida` es el estado de archivo: deja de aparecer en el estudio salvo que se seleccione explícitamente en los filtros.
 - En modo continuo, si el nuevo estado queda fuera del filtro activo, la tarjeta sale del mazo restante.
-- **Ocultar** (`hidden = true`): excluye la tarjeta de **todos** los mazos y templates presentes y futuros, hasta que se des-oculte desde la Biblioteca (ver 7). Es independiente del estado.
+- **Ocultar** (`hidden = true`): excluye la tarjeta de **todos** los mazos y templates presentes y futuros, hasta que se des-oculte desde la Biblioteca (ver 7). Es independiente del estado. No borra la tarjeta ni su historial; se usa cuando ya se la sabe y no se quiere volver a ver. La UI lo explica en el tooltip y en la ayuda, indicando que se recupera desde la Biblioteca con `Mostrar`.
 - **Undo**: permanente y multinivel (máx. 20 acciones). Revierte la última acción (estado u ocultar), restaura history/contadores/estado y vuelve a la tarjeta afectada, aunque haya salido por filtros. Se limpia al iniciar vuelta, repasar o aplicar filtros.
 
 ✔ Ocultar una tarjeta en un template la oculta en todos los demás.
@@ -171,13 +205,17 @@ Al salir no se pregunta nada: la sesión se conserva. Al volver se pregunta **«
 ## 6. Filtros y Templates
 
 ### Filtros
-- **Categorías**: desplegable con checkboxes (multiselección). Default: "Todas". Incluir "Seleccionar todas / ninguna". Las categorías se listan dinámicamente a partir de las tarjetas.
+- **Mazos**: desplegable con checkboxes (multiselección), `Todos` / `Ninguno`.
+  `Todos` es dinámico e incluye mazos futuros. Se pueden combinar mazos aunque
+  compartan categorías.
+- **Categorías**: desplegable con checkboxes (multiselección). Default: "Todas". Incluir "Seleccionar todas / ninguna". Las categorías se listan dinámicamente a partir de la **unión** de los mazos seleccionados y se descartan las que dejan de aplicar al cambiar de mazos.
 - **Estados**: checkboxes `Nueva` / `Fácil` / `Difícil` / `Aprendida`, con `Todas` / `Ninguna`. Default: `Nueva` / `Fácil` / `Difícil`.
 - **Modo continuo**: checkbox que se guarda con la config y con los templates.
-- Si hay una vuelta en curso, aplicar filtros pide confirmación.
+- Si hay una vuelta en curso, aplicar filtros pide confirmación en un diálogo propio.
+- **Administrar mazos**: crear con nombre propio, renombrar y borrar. Borrar un mazo borra sus tarjetas en cascada, con confirmación que muestra el conteo. El último mazo no se puede borrar.
 
 ### Templates
-- Un template guarda: **lado A, lado B, categorías, estados y modo continuo**, bajo un nombre libre (ej. "spa first_1", "banana").
+- Un template guarda: **lado A, lado B, mazos, categorías, estados y modo continuo**, bajo un nombre libre (ej. "spa first_1", "banana").
 - Acciones: guardar el config actual como template, aplicar, renombrar, sobrescribir y borrar.
 - **Al aplicar un template se carga toda la config de una y se inicia una vuelta nueva.**
 - Al abrir la app se carga automáticamente el **último template usado** (o la config de la sesión guardada, si hay una vuelta en curso).
@@ -191,8 +229,11 @@ Al salir no se pregunta nada: la sesión se conserva. Al volver se pregunta **«
 ## 7. Biblioteca (gestión de tarjetas)
 
 Pantalla separada, accesible desde el menú:
-- Lista con búsqueda y filtros (categoría, estado, ocultas).
-- **Alta manual** de tarjeta, **edición** (todos los campos) y **borrado** con confirmación.
+- Lista con búsqueda y filtros (mazo, categoría, estado, ocultas), con badge del
+  mazo en cada tarjeta. En desktop, tarjetas de altura fija con texto truncado;
+  solo la tarjeta en edición crece.
+- **Alta manual** de tarjeta (con selector de mazo), **edición** (todos los
+  campos, incluido el mazo) y **borrado** con diálogo de confirmación.
 - Vista de **ocultas** con acción para **des-ocultar**.
 - **Exportar** todo (CSV y JSON) como backup. Es independiente de la DB.
 
@@ -212,7 +253,7 @@ Pantalla separada, accesible desde el menú:
 - **Tap** en la tarjeta → voltear.
 - **Swipe derecha** → `Fácil`. **Swipe izquierda** → `Difícil`. **Swipe arriba** → `Aprendida`. **Swipe abajo** → `Nueva`. Solo con la tarjeta volteada; si no, avisan que hay que girarla.
 - **Ocultar** tiene un botón propio.
-- Feedback durante el gesto: la tarjeta se inclina y aparece un overlay con **ícono + color** (→ Fácil, ← Difícil, ↑ Aprendida, ↓ Nueva). Umbral de activación para evitar disparos accidentales; si no se supera, la tarjeta vuelve a su lugar.
+- Feedback durante el gesto: la tarjeta se inclina y aparece un overlay con **emoji + color** (`✅` Fácil, `❌` Difícil, `🙈` Aprendida, `☠` Nueva) y la dirección. Umbral de activación para evitar disparos accidentales; si no se supera, la tarjeta vuelve a su lugar.
 - **Botones visibles** (D-pad de 4 flechas) como alternativa a los gestos (no depender solo del swipe).
 - Respetar `prefers-reduced-motion`.
 
@@ -220,14 +261,18 @@ Pantalla separada, accesible desde el menú:
 | tecla | acción |
 |---|---|
 | `Espacio` / `Enter` | voltear |
-| `→` o `2` | Fácil |
-| `←` o `1` | Difícil |
-| `↑` o `3` | Aprendida |
-| `↓` o `4` | Nueva |
+| `→` | Fácil |
+| `←` | Difícil |
+| `↑` | Aprendida |
+| `↓` | Nueva |
 | `H` | ocultar |
 | `Z` | undo |
+| `?` | abrir/cerrar la ayuda |
 
-(Fáciles de cambiar: centralizarlos en un único archivo de config.)
+No hay alias numéricos. Los atajos nunca se disparan con Ctrl, Alt o Meta
+(`Ctrl+?` se rechaza). El botón `?` abre un diálogo que muestra los atajos en
+desktop y los gestos en mobile. Todas las acciones de estudio tienen tooltip
+i18n. (Fáciles de cambiar: centralizados en `src/config/keyboard.ts`.)
 
 ### Temas y accesibilidad
 - **Modo oscuro por defecto** (fondo muy oscuro, ej. `#0f172a`/`#121212`, contrastes suaves) y **modo claro**; toggle accesible. Colores como variables CSS.
@@ -262,6 +307,7 @@ Route handlers REST, validados con Zod, sobre una **capa de repositorio** (para 
 - `POST /api/import/preview`, `POST /api/import/commit`
 - `GET /api/export?format=csv|json`
 - `GET/POST /api/templates`, `PATCH/DELETE /api/templates/:id`, `POST /api/templates/:id/apply`
+- `GET/POST /api/decks`, `PATCH/DELETE /api/decks/:id`
 - `GET/PUT /api/settings`, `GET/PUT /api/session`
 
 ---
@@ -275,6 +321,7 @@ Route handlers REST, validados con Zod, sobre una **capa de repositorio** (para 
 5. **Filtros y templates**, persistencia de sesión.
 6. **Biblioteca**: alta/edición/borrado, ocultas, exportar.
 7. **Pulido**: temas, i18n ES/EN, PWA, accesibilidad, revisión final contra los criterios de aceptación.
+8. **Mazos y UX de estudio**: múltiples mazos con alta/renombrado/borrado en cascada, importación y filtros por mazo, flag `revealed`, ayuda/atajos/gestos, tooltips i18n y confirmaciones modales.
 
 ---
 
@@ -307,7 +354,7 @@ Autenticación y multiusuario (ver v2, sección 13), deploy a producción (ver v
 - Sesión larga (el uso es diario desde el celular); cierre de sesión disponible en el menú.
 
 ### 13.3 Cambios de datos (multiusuario)
-- Agregar `userId` a `cards`, `templates`, `settings` y `session_state`, con índices por usuario. Cada usuario tiene su propio mazo, templates, ocultas y progreso.
+- Agregar `userId` a `decks`, `cards`, `templates`, `settings` y `session_state`, con índices por usuario. Cada usuario tiene sus propios mazos, templates, ocultas y progreso.
 - La clave de matching del importador pasa a ser única **por usuario**.
 - **Migración:** los datos existentes de v1 (sin usuario) se asignan al primer usuario que inicie sesión (el dueño) en el primer arranque de v2, sin pérdida de historial, estados ni templates.
 - El repositorio filtra **siempre** por el `userId` de la sesión; ninguna consulta puede devolver datos de otro usuario.

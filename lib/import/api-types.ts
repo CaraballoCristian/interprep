@@ -11,6 +11,7 @@ export type ImportPlanSummary = {
 };
 
 export type ImportPreviewResponse = {
+  deckId: string;
   headers: string[];
   delimiter: string;
   /** 1-based line number of the detected (or chosen) header row. */

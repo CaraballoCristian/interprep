@@ -1,5 +1,8 @@
 import { eq } from "drizzle-orm";
-import type { StudySession } from "@lib/study/session";
+import {
+  normalizeStudySession,
+  type StudySession,
+} from "@lib/study/session";
 import { getDb } from "../client";
 import { sessionState } from "../schema";
 
@@ -15,19 +18,7 @@ export function loadStudySession(): StudySession | null {
       return null;
     }
 
-    const data = row.data as unknown as StudySession;
-    if (
-      !data ||
-      data.version !== 2 ||
-      !data.config ||
-      !data.round ||
-      !Array.isArray(data.round.deck) ||
-      !Array.isArray(data.round.queue) ||
-      !Array.isArray(data.undoStack)
-    ) {
-      return null;
-    }
-    return data;
+    return normalizeStudySession(row.data);
   } catch {
     // A corrupt row is treated as "no session" and rebuilt from scratch.
     return null;

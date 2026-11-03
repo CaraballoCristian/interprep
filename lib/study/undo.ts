@@ -22,6 +22,7 @@ export type SessionUndo = {
   /** Round state before the undoable action. */
   round: RoundState;
   flipped: boolean;
+  revealed: boolean;
 };
 
 export function createUndoEntry(
@@ -42,12 +43,14 @@ export function createSessionUndo(
   card: StudyCard,
   round: RoundState,
   flipped: boolean,
+  revealed: boolean,
   at: number,
 ): SessionUndo {
   return {
     entry: createUndoEntry(kind, card, at),
     round: cloneRound(round),
     flipped,
+    revealed,
   };
 }
 

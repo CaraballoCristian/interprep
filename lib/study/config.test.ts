@@ -7,6 +7,7 @@ function config(sideA: StudyConfig["sideA"], sideB: StudyConfig["sideB"]): Study
     sideA,
     sideB,
     categories: ["Insurance"],
+    deckIds: null,
     statuses: ["new", "hard"],
     continuous: false,
   };
@@ -66,10 +67,11 @@ describe("toggleSideField", () => {
     expect(next.sideB).toEqual(["termEsp", "termEng"]);
   });
 
-  it("does not change categories or statuses", () => {
+  it("does not change categories, decks or statuses", () => {
     const next = toggleSideField(config([], []), "sideA", "termEng");
 
     expect(next.categories).toEqual(["Insurance"]);
+    expect(next.deckIds).toBeNull();
     expect(next.statuses).toEqual(["new", "hard"]);
   });
 

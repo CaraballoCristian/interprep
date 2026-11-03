@@ -1,4 +1,6 @@
 import type { ImportPreviewResponse } from "@lib/import/api-types";
+import { errorResponse } from "@/server/api-errors";
+import { resolveDeckId } from "@/server/decks";
 import { countCards } from "@/db/repositories/cards";
 import { analyzeImport } from "@/server/import";
 import { importRequestSchema } from "@/server/validation";
@@ -21,35 +23,42 @@ export async function POST(request: Request) {
     );
   }
 
-  const analysis = analyzeImport(
-    parsed.data.content,
-    parsed.data.mapping,
-    parsed.data.headerRow,
-  );
-  const { plan, preview } = analysis;
+  try {
+    const deckId = resolveDeckId(parsed.data.deckId);
+    const analysis = analyzeImport(
+      parsed.data.content,
+      parsed.data.mapping,
+      parsed.data.headerRow,
+      deckId,
+    );
+    const { plan, preview } = analysis;
 
-  const response: ImportPreviewResponse = {
-    headers: analysis.table.headers,
-    delimiter: analysis.table.delimiter,
-    headerRow: analysis.table.headerLine,
-    mapping: analysis.mapping,
-    missingRequired: analysis.missingRequired,
-    counts: preview.counts,
-    sampleRows: preview.rows.slice(0, 8),
-    errors: preview.errors,
-    plan: plan
-      ? {
-          inserts: plan.inserts.length,
-          updates: plan.updates.length,
-          unchanged: plan.unchanged,
-          preserved: plan.preserved,
-          duplicateRows: plan.duplicateRows,
-          validRows: plan.validRows,
-        }
-      : null,
-    existingCards: countCards(),
-    parseErrors: analysis.table.parseErrors,
-  };
+    const response: ImportPreviewResponse = {
+      deckId,
+      headers: analysis.table.headers,
+      delimiter: analysis.table.delimiter,
+      headerRow: analysis.table.headerLine,
+      mapping: analysis.mapping,
+      missingRequired: analysis.missingRequired,
+      counts: preview.counts,
+      sampleRows: preview.rows.slice(0, 8),
+      errors: preview.errors,
+      plan: plan
+        ? {
+            inserts: plan.inserts.length,
+            updates: plan.updates.length,
+            unchanged: plan.unchanged,
+            preserved: plan.preserved,
+            duplicateRows: plan.duplicateRows,
+            validRows: plan.validRows,
+          }
+        : null,
+      existingCards: countCards([deckId]),
+      parseErrors: analysis.table.parseErrors,
+    };
 
-  return Response.json(response);
+    return Response.json(response);
+  } catch (cause) {
+    return errorResponse(cause);
+  }
 }

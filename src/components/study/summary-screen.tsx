@@ -155,6 +155,7 @@ export function SummaryScreen({
                 type="button"
                 onClick={() => onStartReview(selected)}
                 disabled={busy || selected.length === 0}
+                title={t("summary.tooltip.start")}
                 className="min-h-14 w-full rounded-2xl bg-accent px-5 text-base font-semibold text-accent-foreground disabled:opacity-50"
               >
                 {t("summary.start")}
@@ -163,6 +164,7 @@ export function SummaryScreen({
                 type="button"
                 onClick={onFinish}
                 disabled={busy}
+                title={t("summary.tooltip.finish")}
                 className="min-h-12 w-full rounded-2xl border border-border px-5 text-sm font-medium disabled:opacity-50"
               >
                 {t("summary.finish")}
@@ -182,6 +184,7 @@ export function SummaryScreen({
                 type="button"
                 onClick={onNewRound}
                 disabled={busy}
+                title={t("summary.tooltip.newRound")}
                 className="min-h-12 w-full rounded-2xl border border-border px-5 text-sm font-medium disabled:opacity-50"
               >
                 {t("summary.newRound")}

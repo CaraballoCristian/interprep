@@ -10,6 +10,40 @@ const es = {
   "common.study": "Estudiar",
   "common.cancel": "Cancelar",
   "common.save": "Guardar",
+  "common.close": "Cerrar",
+
+  "deck.label": "Mazo",
+  "deck.title": "Mazos",
+  "deck.all": "Todos los mazos",
+  "deck.choose": "Elegir mazos",
+  "deck.empty": "Todavía no hay mazos.",
+  "deck.nameLabel": "Nombre del mazo",
+  "deck.namePlaceholder": 'Ej. "General"',
+  "deck.create": "Crear mazo",
+  "deck.rename": "Renombrar",
+  "deck.delete": "Borrar mazo",
+  "deck.saveName": "Guardar nombre",
+  "deck.cards": "{count} tarjetas",
+  "deck.cardsOne": "{count} tarjeta",
+  "deck.summaryAll": "Todos ({count})",
+  "deck.summaryAllPlain": "Todos",
+  "deck.summaryNone": "Ninguno",
+  "deck.summaryCount": "{selected} de {total}",
+  "deck.confirmDeleteTitle": "Borrar mazo",
+  "deck.confirmDelete":
+    '¿Borrar el mazo "{name}" y sus {count} tarjetas? Esta acción no se puede deshacer.',
+  "deck.manageTitle": "Administrar mazos",
+  "deck.manageDescription":
+    "Creá, renombrá o borrá mazos. Borrar un mazo también borra sus tarjetas.",
+  "deck.notice.created": "Mazo creado.",
+  "deck.notice.renamed": "Mazo renombrado.",
+  "deck.notice.deleted": "Mazo borrado.",
+  "deck.error.invalidName":
+    "El nombre del mazo debe tener entre 1 y 80 caracteres.",
+  "deck.error.duplicateName": "Ya existe un mazo con ese nombre.",
+  "deck.error.last": "No podés borrar el último mazo.",
+  "deck.error.notFound": "El mazo ya no existe.",
+  "deck.error.generic": "No se pudo completar la acción.",
 
   "status.new": "Nueva",
   "status.easy": "Fácil",
@@ -32,6 +66,10 @@ const es = {
   "nav.library": "Biblioteca",
 
   "import.title": "Importar tarjetas",
+  "import.deckLabel": "Mazo de destino",
+  "import.deckHint":
+    "Las tarjetas se importan en el mazo elegido. Reimportar compara solo con las tarjetas de ese mazo.",
+  "import.doneDeck": 'Las tarjetas se importaron en el mazo "{name}".',
   "import.pasteLabel": "Pegá el CSV o TSV",
   "import.upload": "Subir archivo",
   "import.orPaste": "o pegá el texto arriba",
@@ -75,7 +113,7 @@ const es = {
     "El archivo tiene {count} problema(s) de formato. Se intentó interpretar igual.",
   "import.summary": "Resumen",
   "import.existing":
-    "Ya hay {count} tarjetas. Reimportar actualiza las coincidentes y conserva estado, historial y contadores. Las tarjetas que no están en el archivo se conservan.",
+    "Ya hay {count} tarjetas en este mazo. Reimportar actualiza las coincidentes y conserva estado, historial y contadores. Las tarjetas que no están en el archivo se conservan.",
   "import.duplicateRows":
     "{count} fila(s) duplicada(s): se usa la última aparición de cada término.",
   "import.willImport": "Se van a importar {count} tarjetas nuevas.",
@@ -96,7 +134,7 @@ const es = {
   "import.reimport": "Reimportar",
   "import.import": "Importar",
 
-  "study.error.notFlipped": "Girá la tarjeta antes de evaluar.",
+  "study.error.notRevealed": "Girá la tarjeta antes de evaluar.",
   "study.error.undoUnavailable": "No hay acciones para deshacer.",
   "study.error.noCurrentCard": "No hay una tarjeta actual.",
   "study.error.noReviewCards":
@@ -129,11 +167,47 @@ const es = {
   "study.statusGroup": "Estado de la tarjeta",
   "study.uncategorized": "Sin categoría",
   "study.swipe.flipFirst": "Girá para evaluar",
+  "study.tooltip.flip": "Girar la tarjeta (Espacio o Enter)",
+  "study.tooltip.easy": "Fácil: la sabías (→ o deslizá a la derecha)",
+  "study.tooltip.hard": "Difícil: te costó (← o deslizá a la izquierda)",
+  "study.tooltip.learned":
+    "Aprendida: no vuelve a aparecer (↑ o deslizá hacia arriba). Podés restaurarla en la biblioteca.",
+  "study.tooltip.new":
+    "Nueva: no la sabías y vuelve pronto (↓ o deslizá hacia abajo)",
+  "study.tooltip.hide":
+    "Ocultar: la saca de las vueltas sin borrarla. Para recuperarla, mostrala de nuevo desde la biblioteca.",
+  "study.tooltip.undo": "Deshacer la última acción (Z)",
+  "study.tooltip.newRound":
+    "Empezar una vuelta nueva con los mismos filtros",
+  "study.tooltip.help": "Ayuda y atajos (?)",
+  "study.helpTitle": "Ayuda y atajos",
+  "study.helpIntro":
+    "Estas son las acciones disponibles mientras estudiás.",
+  "study.helpKeyboardTitle": "Teclado",
+  "study.helpGestureTitle": "Gestos",
+  "study.helpKeySpace": "Espacio",
+  "study.helpFlip": "Girar la tarjeta",
+  "study.helpEasy": "Fácil",
+  "study.helpHard": "Difícil",
+  "study.helpLearned": "Aprendida",
+  "study.helpNew": "Nueva",
+  "study.helpHide": "Ocultar",
+  "study.helpUndo": "Deshacer",
+  "study.helpHelp": "Abrir o cerrar esta ayuda",
+  "study.helpKeyboardHint":
+    "Los atajos no se activan con Ctrl, Alt o Meta.",
+  "study.helpGestureHint":
+    "Deslizá la tarjeta en la dirección de cada acción.",
+  "study.helpHideDetail":
+    "Ocultar saca la tarjeta de las vueltas sin borrarla. Usalo cuando ya la dominás y no querés verla de nuevo. Para recuperarla, andá a la biblioteca, filtrá por ocultas y elegí Mostrar.",
   "study.resume.title": "¿Retomar la sesión actual?",
   "study.resume.description":
     "Hay una vuelta en curso. Si empezás de cero, se conservan el estado, el historial y los contadores de cada tarjeta.",
   "study.resume.continue": "Sí, retomar",
   "study.resume.restart": "No, empezar de cero",
+  "study.resume.tooltip.continue": "Retomar la vuelta donde la dejaste",
+  "study.resume.tooltip.restart":
+    "Empezar de cero; se conservan estado, historial y contadores",
 
   "summary.roundFinished": "Vuelta terminada",
   "summary.title": "Resumen",
@@ -148,10 +222,16 @@ const es = {
   "summary.start": "Empezar",
   "summary.finish": "Terminar",
   "summary.newRound": "Nueva vuelta",
+  "summary.tooltip.start": "Repasar los estados elegidos",
+  "summary.tooltip.finish": "Cerrar el resumen",
+  "summary.tooltip.newRound":
+    "Empezar otra vuelta con los mismos filtros",
 
   "filters.title": "Filtros y templates",
   "filters.loading": "Cargando filtros…",
   "filters.loadError": "No se pudieron cargar los filtros.",
+  "filters.decksDescription":
+    "Elegí de qué mazos salen las tarjetas. Podés combinar varios.",
   "filters.error.invalidConfig":
     "Cada lado necesita al menos un campo y no pueden compartir campos.",
   "filters.error.invalidName": "El nombre debe tener entre 1 y 80 caracteres.",
@@ -191,6 +271,9 @@ const es = {
     "Hay una vuelta en curso. Si aplicás, empezás de cero y se conservan el estado, el historial y los contadores de cada tarjeta.",
   "filters.confirm.applyWithSession":
     "¿Aplicar de todos modos y empezar de cero?",
+  "filters.confirm.applyTitle": "Empezar de cero",
+  "filters.confirm.overwriteTitle": "Sobrescribir template",
+  "filters.confirm.deleteTitle": "Borrar template",
   "filters.apply": "Aplicar y empezar vuelta",
   "filters.applyNote":
     "Al aplicar se inicia una vuelta nueva con esta configuración.",
@@ -225,6 +308,10 @@ const es = {
   "library.title": "Biblioteca",
   "library.loading": "Cargando biblioteca…",
   "library.loadError": "No se pudo cargar la biblioteca.",
+  "library.deckLabel": "Mazo",
+  "library.allDecks": "Todos los mazos",
+  "library.deck": "Mazo",
+  "library.confirm.deleteTitle": "Borrar tarjeta",
   "library.summary": "{filtered} de {total} {cards} · {hidden} {hiddenWord}",
   "library.cardOne": "tarjeta",
   "library.cardMany": "tarjetas",
@@ -297,6 +384,40 @@ const en: Record<TranslationKey, string> = {
   "common.study": "Study",
   "common.cancel": "Cancel",
   "common.save": "Save",
+  "common.close": "Close",
+
+  "deck.label": "Deck",
+  "deck.title": "Decks",
+  "deck.all": "All decks",
+  "deck.choose": "Choose decks",
+  "deck.empty": "There are no decks yet.",
+  "deck.nameLabel": "Deck name",
+  "deck.namePlaceholder": 'e.g. "General"',
+  "deck.create": "Create deck",
+  "deck.rename": "Rename",
+  "deck.delete": "Delete deck",
+  "deck.saveName": "Save name",
+  "deck.cards": "{count} cards",
+  "deck.cardsOne": "{count} card",
+  "deck.summaryAll": "All ({count})",
+  "deck.summaryAllPlain": "All",
+  "deck.summaryNone": "None",
+  "deck.summaryCount": "{selected} of {total}",
+  "deck.confirmDeleteTitle": "Delete deck",
+  "deck.confirmDelete":
+    'Delete the deck "{name}" and its {count} cards? This cannot be undone.',
+  "deck.manageTitle": "Manage decks",
+  "deck.manageDescription":
+    "Create, rename or delete decks. Deleting a deck also deletes its cards.",
+  "deck.notice.created": "Deck created.",
+  "deck.notice.renamed": "Deck renamed.",
+  "deck.notice.deleted": "Deck deleted.",
+  "deck.error.invalidName":
+    "The deck name must be between 1 and 80 characters.",
+  "deck.error.duplicateName": "A deck with that name already exists.",
+  "deck.error.last": "You cannot delete the last deck.",
+  "deck.error.notFound": "The deck no longer exists.",
+  "deck.error.generic": "The action could not be completed.",
 
   "status.new": "New",
   "status.easy": "Easy",
@@ -319,6 +440,10 @@ const en: Record<TranslationKey, string> = {
   "nav.library": "Library",
 
   "import.title": "Import cards",
+  "import.deckLabel": "Target deck",
+  "import.deckHint":
+    "Cards are imported into the selected deck. Reimporting only compares against cards in that deck.",
+  "import.doneDeck": 'The cards were imported into the deck "{name}".',
   "import.pasteLabel": "Paste the CSV or TSV",
   "import.upload": "Upload file",
   "import.orPaste": "or paste the text above",
@@ -362,7 +487,7 @@ const en: Record<TranslationKey, string> = {
     "The file has {count} format issue(s). It was interpreted anyway.",
   "import.summary": "Summary",
   "import.existing":
-    "There are already {count} cards. Reimporting updates matching cards and preserves status, history and counters. Cards missing from the file are preserved.",
+    "There are already {count} cards in this deck. Reimporting updates matching cards and preserves status, history and counters. Cards missing from the file are preserved.",
   "import.duplicateRows":
     "{count} duplicate row(s): the last occurrence of each term is used.",
   "import.willImport": "{count} new cards will be imported.",
@@ -383,7 +508,7 @@ const en: Record<TranslationKey, string> = {
   "import.reimport": "Reimport",
   "import.import": "Import",
 
-  "study.error.notFlipped": "Flip the card before rating it.",
+  "study.error.notRevealed": "Flip the card before rating it.",
   "study.error.undoUnavailable": "There are no actions to undo.",
   "study.error.noCurrentCard": "There is no current card.",
   "study.error.noReviewCards":
@@ -416,11 +541,44 @@ const en: Record<TranslationKey, string> = {
   "study.statusGroup": "Card status",
   "study.uncategorized": "Uncategorized",
   "study.swipe.flipFirst": "Flip to rate",
+  "study.tooltip.flip": "Flip the card (Space or Enter)",
+  "study.tooltip.easy": "Easy: you knew it (→ or swipe right)",
+  "study.tooltip.hard": "Hard: it was tough (← or swipe left)",
+  "study.tooltip.learned":
+    "Learned: it will not come back (↑ or swipe up). You can restore it from the library.",
+  "study.tooltip.new":
+    "New: you did not know it and it comes back soon (↓ or swipe down)",
+  "study.tooltip.hide":
+    "Hide: removes it from rounds without deleting it. To bring it back, show it again from the library.",
+  "study.tooltip.undo": "Undo the last action (Z)",
+  "study.tooltip.newRound": "Start a new round with the same filters",
+  "study.tooltip.help": "Help and shortcuts (?)",
+  "study.helpTitle": "Help and shortcuts",
+  "study.helpIntro": "These are the actions available while you study.",
+  "study.helpKeyboardTitle": "Keyboard",
+  "study.helpGestureTitle": "Gestures",
+  "study.helpKeySpace": "Space",
+  "study.helpFlip": "Flip the card",
+  "study.helpEasy": "Easy",
+  "study.helpHard": "Hard",
+  "study.helpLearned": "Learned",
+  "study.helpNew": "New",
+  "study.helpHide": "Hide",
+  "study.helpUndo": "Undo",
+  "study.helpHelp": "Open or close this help",
+  "study.helpKeyboardHint":
+    "Shortcuts never fire with Ctrl, Alt or Meta held.",
+  "study.helpGestureHint": "Swipe the card in the direction of each action.",
+  "study.helpHideDetail":
+    "Hiding removes the card from rounds without deleting it. Use it when you already know it and do not want to see it again. To bring it back, go to the library, filter by hidden and choose Show.",
   "study.resume.title": "Resume the current session?",
   "study.resume.description":
     "There is a round in progress. If you start over, the status, history and counters of every card are preserved.",
   "study.resume.continue": "Yes, resume",
   "study.resume.restart": "No, start over",
+  "study.resume.tooltip.continue": "Resume the round where you left it",
+  "study.resume.tooltip.restart":
+    "Start over; status, history and counters are preserved",
 
   "summary.roundFinished": "Round finished",
   "summary.title": "Summary",
@@ -435,10 +593,15 @@ const en: Record<TranslationKey, string> = {
   "summary.start": "Start",
   "summary.finish": "Finish",
   "summary.newRound": "New round",
+  "summary.tooltip.start": "Review the selected statuses",
+  "summary.tooltip.finish": "Close the summary",
+  "summary.tooltip.newRound": "Start another round with the same filters",
 
   "filters.title": "Filters & templates",
   "filters.loading": "Loading filters…",
   "filters.loadError": "The filters could not be loaded.",
+  "filters.decksDescription":
+    "Choose which decks the cards come from. You can combine several.",
   "filters.error.invalidConfig":
     "Each side needs at least one field and they cannot share fields.",
   "filters.error.invalidName": "The name must be between 1 and 80 characters.",
@@ -477,6 +640,9 @@ const en: Record<TranslationKey, string> = {
     "There is a round in progress. If you apply, you start over and the status, history and counters of every card are preserved.",
   "filters.confirm.applyWithSession":
     "Apply anyway and start over?",
+  "filters.confirm.applyTitle": "Start over",
+  "filters.confirm.overwriteTitle": "Overwrite template",
+  "filters.confirm.deleteTitle": "Delete template",
   "filters.apply": "Apply and start round",
   "filters.applyNote": "Applying starts a new round with this configuration.",
   "filters.saveTitle": "Save as template",
@@ -510,6 +676,10 @@ const en: Record<TranslationKey, string> = {
   "library.title": "Library",
   "library.loading": "Loading library…",
   "library.loadError": "The library could not be loaded.",
+  "library.deckLabel": "Deck",
+  "library.allDecks": "All decks",
+  "library.deck": "Deck",
+  "library.confirm.deleteTitle": "Delete card",
   "library.summary": "{filtered} of {total} {cards} · {hidden} {hiddenWord}",
   "library.cardOne": "card",
   "library.cardMany": "cards",

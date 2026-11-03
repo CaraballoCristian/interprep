@@ -26,8 +26,9 @@ export type ImportAnalysis = {
  */
 export function analyzeImport(
   content: string,
-  mappingInput?: Partial<ColumnMapping>,
-  headerRowInput?: number,
+  mappingInput: Partial<ColumnMapping> | undefined,
+  headerRowInput: number | undefined,
+  deckId: string,
 ): ImportAnalysis {
   const table = parseDelimited(content, {
     headerRow:
@@ -40,7 +41,7 @@ export function analyzeImport(
   const validation = validateMapping(mapping, table.headers.length);
   const preview = buildPreview(table, mapping);
   const plan = validation.valid
-    ? buildImportPlan(preview.rows, listCardsForMatching())
+    ? buildImportPlan(preview.rows, listCardsForMatching(deckId))
     : null;
 
   return {

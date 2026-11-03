@@ -14,17 +14,19 @@ export function cardWeight(card: Pick<StudyCard, "history">): number {
 }
 
 /**
- * A card belongs to the deck when it is not hidden, its status is selected
- * and its category is selected (or all categories are selected).
+ * A card belongs to the deck when it is not hidden, its status is selected,
+ * its category is selected (or all categories are selected) and its deck is
+ * selected (or all decks are selected).
  */
 export function buildDeck(
   cards: readonly StudyCard[],
-  config: Pick<StudyConfig, "categories" | "statuses">,
+  config: Pick<StudyConfig, "categories" | "deckIds" | "statuses">,
 ): StudyCard[] {
   return cards.filter(
     (card) =>
       !card.hidden &&
       config.statuses.includes(card.status) &&
+      (config.deckIds === null || config.deckIds.includes(card.deckId)) &&
       (config.categories === null ||
         config.categories.includes(card.category)),
   );

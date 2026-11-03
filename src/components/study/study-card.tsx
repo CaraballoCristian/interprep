@@ -20,6 +20,20 @@ const STATUS_KEYS: Record<CardStatus, TranslationKey> = {
   learned: "status.learned",
 };
 
+const STATUS_ICONS: Record<CardStatus, string> = {
+  learned: "🙈",
+  new: "☠",
+  hard: "❌",
+  easy: "✅",
+};
+
+const STATUS_TOOLTIP_KEYS: Record<CardStatus, TranslationKey> = {
+  new: "study.tooltip.new",
+  easy: "study.tooltip.easy",
+  hard: "study.tooltip.hard",
+  learned: "study.tooltip.learned",
+};
+
 /** Swipe direction for each status. */
 const STATUS_DIRECTION: Record<CardStatus, "up" | "down" | "left" | "right"> = {
   learned: "up",
@@ -110,22 +124,24 @@ type StudyCardProps = {
   card: StudyCardModel;
   config: StudyConfig;
   flipped: boolean;
+  revealed: boolean;
   busy: boolean;
   onFlip: () => void;
   onHide: () => void;
   onStatusChange: (status: CardStatus) => void;
-  onNotFlipped: () => void;
+  onNotRevealed: () => void;
 };
 
 export function StudyCardView({
   card,
   config,
   flipped,
+  revealed,
   busy,
   onFlip,
   onHide,
   onStatusChange,
-  onNotFlipped,
+  onNotRevealed,
 }: StudyCardProps) {
   const { t } = useI18n();
   const reducedMotion = useReducedMotion();
@@ -133,8 +149,8 @@ export function StudyCardView({
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
 
   function choose(status: CardStatus) {
-    if (!flipped) {
-      onNotFlipped();
+    if (!revealed) {
+      onNotRevealed();
       return;
     }
     onStatusChange(status);
@@ -160,8 +176,8 @@ export function StudyCardView({
       return;
     }
 
-    if (!flipped) {
-      onNotFlipped();
+    if (!revealed) {
+      onNotRevealed();
       return;
     }
 
@@ -187,9 +203,9 @@ export function StudyCardView({
   let overlay: { icon: string; label: string; className: string } | null = null;
 
   if (drag.active && distance > 8) {
-    if (!flipped) {
+    if (!revealed) {
       overlay = {
-        icon: "↔",
+        icon: "🔄",
         label: t("study.swipe.flipFirst"),
         className: "border-border bg-surface-2 text-muted",
       };
@@ -203,14 +219,7 @@ export function StudyCardView({
           : "new";
 
       overlay = {
-        icon:
-          status === "easy"
-            ? "→"
-            : status === "hard"
-              ? "←"
-              : status === "learned"
-                ? "↑"
-                : "↓",
+        icon: STATUS_ICONS[status],
         label: t(STATUS_KEYS[status]),
         className:
           status === "easy"
@@ -236,6 +245,7 @@ export function StudyCardView({
         role="button"
         tabIndex={0}
         aria-label={flipped ? t("study.showQuestion") : t("study.showAnswer")}
+        title={t("study.tooltip.flip")}
         onClick={handleClick}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -285,6 +295,7 @@ export function StudyCardView({
               onHide();
             }}
             disabled={busy}
+            title={t("study.tooltip.hide")}
             className="min-h-12 shrink-0 rounded-xl border border-border px-3 text-xs font-medium text-muted disabled:opacity-50"
           >
             {t("study.hide")}
@@ -412,6 +423,7 @@ function StatusButton({
       disabled={busy}
       aria-pressed={active}
       aria-label={`${t(STATUS_KEYS[status])} (${direction})`}
+      title={t(STATUS_TOOLTIP_KEYS[status])}
       className={`flex min-h-12 flex-col items-center justify-center rounded-xl border text-[11px] font-semibold disabled:opacity-50 ${
         active
           ? "border-accent bg-accent/15 text-accent"

@@ -42,6 +42,7 @@ export type TemplateInput = {
   sideA: SideField[];
   sideB: SideField[];
   categories: string[] | null;
+  deckIds: string[] | null;
   statuses: CardStatus[];
   continuous: boolean;
 };

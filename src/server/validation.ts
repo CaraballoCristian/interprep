@@ -15,6 +15,8 @@ export const importRequestSchema = z.object({
   mapping: importMappingSchema.optional(),
   /** 1-based header row. Omitted means "detect it automatically". */
   headerRow: z.number().int().min(1).max(100_000).optional(),
+  /** Target deck. Omitted means the first deck (legacy clients). */
+  deckId: z.string().min(1).optional(),
 });
 
 export type ImportRequest = z.infer<typeof importRequestSchema>;
@@ -27,6 +29,7 @@ export const studyConfigSchema = z.object({
   sideA: z.array(z.enum(SIDE_FIELDS)),
   sideB: z.array(z.enum(SIDE_FIELDS)),
   categories: z.array(z.string()).nullable(),
+  deckIds: z.array(z.string()).nullable(),
   statuses: z.array(z.enum(CARD_STATUSES)),
   continuous: z.boolean(),
 });
@@ -50,6 +53,7 @@ export const templateUpdateSchema = z.object({
  * duplicate term pairs) live in the pure card validation and the service.
  */
 export const cardCreateSchema = z.object({
+  deckId: z.string().min(1).optional(),
   termEng: z.string().optional(),
   termEsp: z.string().optional(),
   category: z.string().optional(),
@@ -59,6 +63,14 @@ export const cardCreateSchema = z.object({
 
 export const cardUpdateSchema = cardCreateSchema.extend({
   hidden: z.boolean().optional(),
+});
+
+export const deckCreateSchema = z.object({
+  name: z.string(),
+});
+
+export const deckUpdateSchema = z.object({
+  name: z.string().optional(),
 });
 
 export const exportFormatSchema = z.enum(["csv", "json"]);

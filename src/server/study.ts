@@ -32,6 +32,7 @@ import {
   updateCardHidden,
   updateCardStudyFields,
 } from "@/db/repositories/cards";
+import { listDecks } from "@/db/repositories/decks";
 import {
   loadStudySession,
   saveStudySession,
@@ -39,10 +40,11 @@ import {
 import { getTemplateById } from "@/db/repositories/templates";
 import type { Template } from "@/db/schema";
 import { getSettings } from "@/db/bootstrap";
+import { pruneConfigDecks } from "./decks";
 
 export type StudyErrorCode =
   | "no_current_card"
-  | "not_flipped"
+  | "not_revealed"
   | "undo_unavailable"
   | "no_review_cards";
 
@@ -60,6 +62,7 @@ const DEFAULT_CONFIG: StudyConfig = {
   sideA: ["termEng"],
   sideB: ["termEsp", "description"],
   categories: null,
+  deckIds: null,
   statuses: [...DEFAULT_CARD_STATUSES],
   continuous: false,
 };
@@ -81,6 +84,7 @@ function configFromTemplate(template: Template | null): {
       sideA: template.sideA,
       sideB: template.sideB,
       categories: template.categories,
+      deckIds: template.deckIds,
       statuses: template.statuses,
       continuous: template.continuous,
     }),
@@ -132,6 +136,7 @@ function freshSession(
     templateId,
     round: createRound(buildDeck(cards, config), modeFor(config), random),
     flipped: false,
+    revealed: false,
     undoStack: [],
     resumePending: false,
     createdAt: now,
@@ -141,14 +146,16 @@ function freshSession(
 
 function repairSession(session: StudySession): StudySession {
   const cards = listStudyCards();
-  const deck = buildDeck(cards, session.config);
-  const round = repairRound(session.round, cards, session.config);
+  const existingDeckIds = new Set(listDecks().map((deck) => deck.id));
+  const config = pruneConfigDecks(session.config, existingDeckIds);
+  const deck = buildDeck(cards, config);
+  const round = repairRound(session.round, cards, config);
   const cardsById = new Map(cards.map((card) => [card.id, card]));
 
   // A session saved while the deck was empty can pick up newly imported cards.
   if (round.deck.length === 0 && round.answered === 0 && deck.length > 0) {
     return {
-      ...freshSession(session.config, session.templateId, cards),
+      ...freshSession(config, session.templateId, cards),
       createdAt: session.createdAt,
     };
   }
@@ -158,11 +165,12 @@ function repairSession(session: StudySession): StudySession {
     cardsById.has(item.entry.cardId),
   );
 
+  const configChanged = config !== session.config;
   const roundChanged = round !== session.round;
   const undoChanged = undoStack.length !== session.undoStack.length;
 
-  return roundChanged || undoChanged
-    ? { ...session, round, undoStack }
+  return configChanged || roundChanged || undoChanged
+    ? { ...session, config, round, undoStack }
     : session;
 }
 
@@ -221,6 +229,7 @@ function buildView(
     templateId: session.templateId,
     mode: round.mode,
     flipped: session.flipped,
+    revealed: session.revealed,
     card,
     progress: {
       seen: metrics.seen,
@@ -263,20 +272,30 @@ export function applyStudyAction(
   switch (action.type) {
     case "flip": {
       session.flipped = action.flipped;
+      if (action.flipped) {
+        session.revealed = true;
+      }
       markResumePending(session);
       persist(session);
       return buildView(session, { suppressResumePrompt: true });
     }
 
     case "status": {
-      if (!session.flipped) {
-        throw new StudyError("not_flipped");
+      if (!session.revealed) {
+        throw new StudyError("not_revealed");
       }
 
       const card = currentCardOrThrow(session);
       session.undoStack = pushUndo(
         session.undoStack,
-        createSessionUndo("status", card, session.round, session.flipped, now),
+        createSessionUndo(
+          "status",
+          card,
+          session.round,
+          session.flipped,
+          session.revealed,
+          now,
+        ),
       );
 
       const withResult =
@@ -298,6 +317,7 @@ export function applyStudyAction(
         random,
       });
       session.flipped = false;
+      session.revealed = false;
       markResumePending(session);
       persist(session);
       return buildView(session, { suppressResumePrompt: true });
@@ -307,12 +327,20 @@ export function applyStudyAction(
       const card = currentCardOrThrow(session);
       session.undoStack = pushUndo(
         session.undoStack,
-        createSessionUndo("hide", card, session.round, session.flipped, now),
+        createSessionUndo(
+          "hide",
+          card,
+          session.round,
+          session.flipped,
+          session.revealed,
+          now,
+        ),
       );
 
       updateCardHidden(card.id, true);
       session.round = removeCurrentFromRound(session.round);
       session.flipped = false;
+      session.revealed = false;
       markResumePending(session);
       persist(session);
       return buildView(session, { suppressResumePrompt: true });
@@ -331,6 +359,7 @@ export function applyStudyAction(
         session.config,
       );
       session.flipped = undo.flipped;
+      session.revealed = undo.revealed;
       session.undoStack = session.undoStack.slice(0, -1);
       markResumePending(session);
       persist(session);
@@ -345,6 +374,7 @@ export function applyStudyAction(
         random,
       );
       session.flipped = false;
+      session.revealed = false;
       session.undoStack = [];
       markResumePending(session);
       persist(session);
@@ -366,6 +396,7 @@ export function applyStudyAction(
 
       session.round = round;
       session.flipped = false;
+      session.revealed = false;
       session.undoStack = [];
       markResumePending(session);
       persist(session);
@@ -415,11 +446,12 @@ export function applyStudyAction(
  * comes from manual filters.
  */
 export function applyStudyConfig(
-  config: StudyConfig,
+  inputConfig: StudyConfig,
   templateId: string | null = null,
 ): StudyView {
   const session = ensureSession();
   const cards = listStudyCards();
+  const config = pruneConfigDecks(inputConfig);
   const fresh = freshSession(config, templateId, cards);
   fresh.createdAt = session.createdAt;
 

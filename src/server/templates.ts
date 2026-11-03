@@ -1,3 +1,4 @@
+import type { DeckSummary } from "@lib/decks/types";
 import { buildDeck } from "@lib/study/deck";
 import type { StudyView } from "@lib/study/session";
 import type { StudyConfig } from "@lib/study/types";
@@ -6,11 +7,11 @@ import {
   validateConfig,
   validateTemplateName,
 } from "@lib/templates/validation";
+import { countCards, listStudyCards } from "@/db/repositories/cards";
 import {
-  countCards,
-  listCategories,
-  listStudyCards,
-} from "@/db/repositories/cards";
+  listCategoriesByDeck,
+  listDeckSummaries,
+} from "@/db/repositories/decks";
 import { setLastTemplateId } from "@/db/repositories/settings";
 import {
   createTemplate,
@@ -22,6 +23,10 @@ import {
   type TemplateInput,
 } from "@/db/repositories/templates";
 import type { Template } from "@/db/schema";
+import {
+  categoriesForDecks,
+  pruneConfigDecks,
+} from "./decks";
 import {
   applyStudyConfig,
   detachSessionTemplate,
@@ -39,7 +44,11 @@ export type TemplateView = {
 export type FiltersView = {
   config: StudyConfig;
   templateId: string | null;
+  /** Categories available in the selected decks. */
   categories: string[];
+  /** Categories present in each deck, used to recompute the union live. */
+  categoriesByDeck: Record<string, string[]>;
+  decks: DeckSummary[];
   templates: TemplateView[];
   cardCount: number;
   deckCount: number;
@@ -69,6 +78,7 @@ function configFromTemplate(template: Template): StudyConfig {
     sideA: template.sideA,
     sideB: template.sideB,
     categories: template.categories,
+    deckIds: template.deckIds,
     statuses: template.statuses,
     continuous: template.continuous,
   });
@@ -78,7 +88,7 @@ function toTemplateView(template: Template): TemplateView {
   return {
     id: template.id,
     name: template.name,
-    config: configFromTemplate(template),
+    config: pruneConfigDecks(configFromTemplate(template)),
     createdAt: template.createdAt,
     updatedAt: template.updatedAt,
   };
@@ -89,7 +99,7 @@ function requireConfig(value: unknown): StudyConfig {
   if (!result.ok) {
     throw new TemplateError("invalid_config");
   }
-  return result.config;
+  return pruneConfigDecks(result.config);
 }
 
 function requireName(value: unknown): string {
@@ -108,14 +118,24 @@ export function listTemplateViews(): TemplateView[] {
 export function getFiltersView(): FiltersView {
   const view = getStudyView();
   const cards = listStudyCards();
+  const decks = listDeckSummaries();
+  const config = pruneConfigDecks(view.config);
+  const categoriesByDeck = listCategoriesByDeck();
+  const allDeckIds = decks.map((deck) => deck.id);
 
   return {
-    config: view.config,
+    config,
     templateId: view.templateId,
-    categories: listCategories(),
+    categories: categoriesForDecks(
+      config.deckIds,
+      categoriesByDeck,
+      allDeckIds,
+    ),
+    categoriesByDeck,
+    decks,
     templates: listTemplateViews(),
     cardCount: countCards(),
-    deckCount: buildDeck(cards, view.config).length,
+    deckCount: buildDeck(cards, config).length,
     sessionActive: view.progress.answered > 0,
   };
 }
@@ -197,6 +217,7 @@ export function applyTemplateToSession(id: string): StudyView {
     sideA: template.sideA,
     sideB: template.sideB,
     categories: template.categories,
+    deckIds: template.deckIds,
     statuses: template.statuses,
     continuous: template.continuous,
   });

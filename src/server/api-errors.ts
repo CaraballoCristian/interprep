@@ -1,3 +1,4 @@
+import { DeckError } from "./decks";
 import { LibraryError } from "./library";
 import { StudyError } from "./study";
 import { TemplateError } from "./templates";
@@ -9,6 +10,16 @@ export function errorResponse(cause: unknown): Response {
       cause.code === "not_found"
         ? 404
         : cause.code === "duplicate_card"
+          ? 409
+          : 400;
+    return Response.json({ error: cause.code }, { status });
+  }
+
+  if (cause instanceof DeckError) {
+    const status =
+      cause.code === "not_found"
+        ? 404
+        : cause.code === "duplicate_name" || cause.code === "last_deck"
           ? 409
           : 400;
     return Response.json({ error: cause.code }, { status });

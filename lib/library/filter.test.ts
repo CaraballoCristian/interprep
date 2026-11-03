@@ -11,6 +11,7 @@ import type { LibraryCard } from "./types";
 function card(overrides: Partial<LibraryCard>): LibraryCard {
   return {
     id: overrides.id ?? "id",
+    deckId: overrides.deckId ?? "deck-general",
     termEng: overrides.termEng ?? "",
     termEsp: overrides.termEsp ?? "",
     category: overrides.category ?? "",
@@ -71,6 +72,7 @@ describe("normalizeLibraryFilter", () => {
   it("keeps a complete filter", () => {
     const input: LibraryFilter = {
       search: "  policy ",
+      deckId: "deck-general",
       category: "Insurance",
       status: "hard",
       hidden: "hidden",
@@ -78,6 +80,7 @@ describe("normalizeLibraryFilter", () => {
 
     expect(normalizeLibraryFilter(input)).toEqual({
       search: "policy",
+      deckId: "deck-general",
       category: "Insurance",
       status: "hard",
       hidden: "hidden",
@@ -173,6 +176,21 @@ describe("filterCards", () => {
       "uncategorized",
     ]);
     expect(filterCards(cards, filter({ category: "Missing" }))).toEqual([]);
+  });
+
+  it("filters by deck", () => {
+    const withDecks = [
+      card({ id: "general", deckId: "deck-general" }),
+      card({ id: "legal", deckId: "deck-legal" }),
+    ];
+
+    expect(ids(filterCards(withDecks, filter({ deckId: "deck-legal" })))).toEqual(
+      ["legal"],
+    );
+    expect(ids(filterCards(withDecks, filter({ deckId: null })))).toEqual([
+      "general",
+      "legal",
+    ]);
   });
 
   it("filters by status", () => {

@@ -4,6 +4,7 @@ import {
   TEMPLATE_NAME_MAX_LENGTH,
   normalizeConfig,
   sanitizeCategories,
+  sanitizeDeckIds,
   sanitizeSide,
   sanitizeStatuses,
   sanitizeTemplateName,
@@ -15,6 +16,7 @@ const validConfig: StudyConfig = {
   sideA: ["termEng"],
   sideB: ["termEsp", "description"],
   categories: ["Insurance", "Court"],
+  deckIds: ["deck-general"],
   statuses: ["new", "hard"],
   continuous: false,
 };
@@ -82,18 +84,40 @@ describe("sanitizeCategories", () => {
   });
 });
 
+describe("sanitizeDeckIds", () => {
+  it("maps null and missing to all decks", () => {
+    expect(sanitizeDeckIds(null)).toBeNull();
+    expect(sanitizeDeckIds(undefined)).toBeNull();
+  });
+
+  it("keeps an explicit empty array", () => {
+    expect(sanitizeDeckIds([])).toEqual([]);
+  });
+
+  it("trims, deduplicates and drops empty ids", () => {
+    expect(
+      sanitizeDeckIds([" deck-a ", "", "deck-b", "deck-a", 3]),
+    ).toEqual(["deck-a", "deck-b"]);
+  });
+
+  it("returns an empty array for non-array input", () => {
+    expect(sanitizeDeckIds("deck-a")).toEqual([]);
+  });
+});
+
 describe("normalizeConfig", () => {
   it("normalizes a complete config", () => {
     expect(normalizeConfig(validConfig)).toEqual(validConfig);
   });
 
-  it("fills missing statuses and categories", () => {
+  it("fills missing statuses, categories and decks", () => {
     expect(
       normalizeConfig({ sideA: ["termEng"], sideB: ["termEsp"] }),
     ).toEqual({
       sideA: ["termEng"],
       sideB: ["termEsp"],
       categories: null,
+      deckIds: null,
       statuses: ["new", "easy", "hard"],
       continuous: false,
     });
@@ -104,6 +128,7 @@ describe("normalizeConfig", () => {
       sideA: [],
       sideB: [],
       categories: null,
+      deckIds: null,
       statuses: ["new", "easy", "hard"],
       continuous: false,
     });

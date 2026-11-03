@@ -1,4 +1,4 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import type {
   CardInsert,
   CardUpdate,
@@ -14,29 +14,47 @@ import { cards } from "../schema";
 
 const INSERT_CHUNK_SIZE = 200;
 
-export function countCards(): number {
-  const row = getDb()
-    .select({ count: sql<number>`count(*)` })
-    .from(cards)
-    .get();
+/**
+ * `null`/undefined counts every deck. An empty array means no decks and
+ * therefore zero cards.
+ */
+export function countCards(deckIds?: readonly string[] | null): number {
+  if (deckIds && deckIds.length === 0) {
+    return 0;
+  }
+
+  const query = getDb().select({ count: sql<number>`count(*)` }).from(cards);
+  const row = deckIds
+    ? query.where(inArray(cards.deckId, [...deckIds])).get()
+    : query.get();
   return row?.count ?? 0;
 }
 
 /**
- * Distinct categories present in the cards table, sorted for the filters UI.
- * The empty string is kept: imported cards without a category use it.
+ * Distinct categories present in the selected decks, sorted for the filters
+ * UI. The empty string is kept: imported cards without a category use it.
  */
-export function listCategories(): string[] {
-  return getDb()
+export function listCategories(
+  deckIds?: readonly string[] | null,
+): string[] {
+  if (deckIds && deckIds.length === 0) {
+    return [];
+  }
+
+  const query = getDb()
     .selectDistinct({ category: cards.category })
-    .from(cards)
-    .all()
+    .from(cards);
+  const rows = deckIds
+    ? query.where(inArray(cards.deckId, [...deckIds])).all()
+    : query.all();
+
+  return rows
     .map((row) => row.category)
     .sort((a, b) => a.localeCompare(b, "es"));
 }
 
 /** Lightweight projection used by the importer to match existing cards. */
-export function listCardsForMatching(): ExistingCard[] {
+export function listCardsForMatching(deckId: string): ExistingCard[] {
   return getDb()
     .select({
       id: cards.id,
@@ -47,6 +65,7 @@ export function listCardsForMatching(): ExistingCard[] {
       description: cards.description,
     })
     .from(cards)
+    .where(eq(cards.deckId, deckId))
     .all();
 }
 
@@ -59,10 +78,13 @@ export type ApplyImportResult = {
  * Applies an import plan atomically. New cards get default status/history
  * values; existing cards keep status, hidden flag, history and counters.
  */
-export function applyImportPlan(plan: {
-  inserts: readonly CardInsert[];
-  updates: readonly CardUpdate[];
-}): ApplyImportResult {
+export function applyImportPlan(
+  plan: {
+    inserts: readonly CardInsert[];
+    updates: readonly CardUpdate[];
+  },
+  deckId: string,
+): ApplyImportResult {
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -72,6 +94,7 @@ export function applyImportPlan(plan: {
         .slice(i, i + INSERT_CHUNK_SIZE)
         .map((card) => ({
           id: crypto.randomUUID(),
+          deckId,
           category: card.category,
           termEng: card.termEng,
           termEsp: card.termEsp,
@@ -108,6 +131,7 @@ export function applyImportPlan(plan: {
 
 const studyCardColumns = {
   id: cards.id,
+  deckId: cards.deckId,
   category: cards.category,
   termEng: cards.termEng,
   termEsp: cards.termEsp,
@@ -212,6 +236,7 @@ export function restoreCardFields(
 
 const libraryCardColumns = {
   id: cards.id,
+  deckId: cards.deckId,
   termEng: cards.termEng,
   termEsp: cards.termEsp,
   category: cards.category,
@@ -240,16 +265,21 @@ export function getCardById(id: string): LibraryCard | null {
 }
 
 /**
- * Finds a card with the same normalized term pair. `excludeId` lets an edit
- * keep its own key without colliding with itself.
+ * Finds a card with the same normalized term pair inside a deck. `excludeId`
+ * lets an edit keep its own key without colliding with itself.
  */
 export function findCardByMatchKey(
+  deckId: string,
   key: string,
   excludeId?: string,
 ): { id: string } | null {
   const where = excludeId
-    ? and(eq(cards.matchKey, key), ne(cards.id, excludeId))
-    : eq(cards.matchKey, key);
+    ? and(
+        eq(cards.deckId, deckId),
+        eq(cards.matchKey, key),
+        ne(cards.id, excludeId),
+      )
+    : and(eq(cards.deckId, deckId), eq(cards.matchKey, key));
 
   const row = getDb()
     .select({ id: cards.id })
@@ -261,6 +291,7 @@ export function findCardByMatchKey(
 }
 
 export type LibraryCardInput = {
+  deckId: string;
   termEng: string;
   termEsp: string;
   category: string;
@@ -276,6 +307,7 @@ export function createCard(input: LibraryCardInput): LibraryCard {
     .insert(cards)
     .values({
       id: crypto.randomUUID(),
+      deckId: input.deckId,
       category: input.category,
       termEng: input.termEng,
       termEsp: input.termEsp,
@@ -301,6 +333,7 @@ export function updateCard(
   const row = getDb()
     .update(cards)
     .set({
+      deckId: input.deckId,
       category: input.category,
       termEng: input.termEng,
       termEsp: input.termEsp,

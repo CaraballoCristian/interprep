@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { StudyAction, StudyView } from "@lib/study/session";
 import type { CardStatus } from "@lib/types";
 import { useI18n } from "@/components/settings-provider";
+import { HelpDialog } from "@/components/help-dialog";
 import { matchesShortcut } from "@/config/keyboard";
 import { StudyCardView } from "@/components/study/study-card";
 import { SummaryScreen } from "@/components/study/summary-screen";
@@ -16,6 +17,7 @@ export default function StudyPage() {
   const [view, setView] = useState<StudyView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const busyRef = useRef(false);
   const loadedRef = useRef(false);
 
@@ -27,8 +29,8 @@ export default function StudyPage() {
           : undefined;
 
       switch (code) {
-        case "not_flipped":
-          return t("study.error.notFlipped");
+        case "not_revealed":
+          return t("study.error.notRevealed");
         case "undo_unavailable":
           return t("study.error.undoUnavailable");
         case "no_current_card":
@@ -126,13 +128,13 @@ export default function StudyPage() {
 
   const requestStatus = useCallback(
     (status: CardStatus) => {
-      if (!view?.flipped) {
-        setError(t("study.error.notFlipped"));
+      if (!view?.revealed) {
+        setError(t("study.error.notRevealed"));
         return;
       }
       void act({ type: "status", status });
     },
-    [act, t, view?.flipped],
+    [act, t, view?.revealed],
   );
 
   useEffect(() => {
@@ -160,7 +162,13 @@ export default function StudyPage() {
         return;
       }
 
-      if (view.resumePending) {
+      if (matchesShortcut(event, "help")) {
+        event.preventDefault();
+        setHelpOpen((open) => !open);
+        return;
+      }
+
+      if (helpOpen || view.resumePending) {
         return;
       }
 
@@ -204,7 +212,7 @@ export default function StudyPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [act, requestStatus, view]);
+  }, [act, helpOpen, requestStatus, view]);
 
   if (!view) {
     return (
@@ -224,9 +232,20 @@ export default function StudyPage() {
       <header className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-base font-semibold">{t("common.study")}</h1>
-          <span className="text-sm font-medium tabular-nums">
-            {view.progress.seen} / {view.progress.total}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              aria-label={t("study.tooltip.help")}
+              title={t("study.tooltip.help")}
+              className="flex h-12 w-12 items-center justify-center rounded-xl border border-border text-base font-semibold text-muted"
+            >
+              ?
+            </button>
+            <span className="text-sm font-medium tabular-nums">
+              {view.progress.seen} / {view.progress.total}
+            </span>
+          </div>
         </div>
 
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
@@ -310,19 +329,20 @@ export default function StudyPage() {
               card={view.card}
               config={view.config}
               flipped={view.flipped}
+              revealed={view.revealed}
               busy={busy}
               onFlip={() =>
                 void act({ type: "flip", flipped: !view.flipped })
               }
               onHide={() => void act({ type: "hide" })}
               onStatusChange={requestStatus}
-              onNotFlipped={() => setError(t("study.error.notFlipped"))}
+              onNotRevealed={() => setError(t("study.error.notRevealed"))}
             />
           </div>
 
           <div className="flex min-h-12 items-center justify-between gap-3">
             <p className="text-xs text-muted">
-              {view.flipped
+              {view.revealed
                 ? t("study.hintFlipped")
                 : t("study.hintUnflipped")}
             </p>
@@ -331,6 +351,7 @@ export default function StudyPage() {
                 type="button"
                 onClick={() => void act({ type: "undo" })}
                 disabled={busy}
+                title={t("study.tooltip.undo")}
                 className="min-h-12 shrink-0 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
               >
                 {t("study.undo", { count: view.undoCount })}
@@ -350,6 +371,7 @@ export default function StudyPage() {
             type="button"
             onClick={() => void act({ type: "new-round" })}
             disabled={busy}
+            title={t("study.tooltip.newRound")}
             className="min-h-12 rounded-xl bg-accent px-5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
           >
             {t("study.newRound")}
@@ -378,6 +400,7 @@ export default function StudyPage() {
                 type="button"
                 onClick={() => void act({ type: "resume" })}
                 disabled={busy}
+                title={t("study.resume.tooltip.continue")}
                 className="min-h-14 w-full rounded-2xl bg-accent px-5 text-base font-semibold text-accent-foreground disabled:opacity-50"
               >
                 {t("study.resume.continue")}
@@ -386,6 +409,7 @@ export default function StudyPage() {
                 type="button"
                 onClick={() => void act({ type: "reset" })}
                 disabled={busy}
+                title={t("study.resume.tooltip.restart")}
                 className="min-h-12 w-full rounded-2xl border border-border px-5 text-sm font-medium disabled:opacity-50"
               >
                 {t("study.resume.restart")}
@@ -394,6 +418,8 @@ export default function StudyPage() {
           </section>
         </div>
       )}
+
+      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
     </main>
   );
 }

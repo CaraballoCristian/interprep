@@ -1,4 +1,6 @@
 import type { ImportCommitResponse } from "@lib/import/api-types";
+import { errorResponse } from "@/server/api-errors";
+import { resolveDeckId } from "@/server/decks";
 import { applyImportPlan } from "@/db/repositories/cards";
 import { analyzeImport } from "@/server/import";
 import { importRequestSchema } from "@/server/validation";
@@ -21,39 +23,45 @@ export async function POST(request: Request) {
     );
   }
 
-  const analysis = analyzeImport(
-    parsed.data.content,
-    parsed.data.mapping,
-    parsed.data.headerRow,
-  );
-
-  if (!analysis.validation.valid || !analysis.plan) {
-    return Response.json(
-      {
-        error: "invalid_mapping",
-        missingRequired: analysis.missingRequired,
-      },
-      { status: 400 },
+  try {
+    const deckId = resolveDeckId(parsed.data.deckId);
+    const analysis = analyzeImport(
+      parsed.data.content,
+      parsed.data.mapping,
+      parsed.data.headerRow,
+      deckId,
     );
+
+    if (!analysis.validation.valid || !analysis.plan) {
+      return Response.json(
+        {
+          error: "invalid_mapping",
+          missingRequired: analysis.missingRequired,
+        },
+        { status: 400 },
+      );
+    }
+
+    if (analysis.plan.validRows === 0) {
+      return Response.json(
+        { error: "no_valid_rows", counts: analysis.preview.counts },
+        { status: 400 },
+      );
+    }
+
+    const result = applyImportPlan(analysis.plan, deckId);
+
+    const response: ImportCommitResponse = {
+      inserted: result.inserted,
+      updated: result.updated,
+      unchanged: analysis.plan.unchanged,
+      preserved: analysis.plan.preserved,
+      skippedErrors: analysis.preview.errors.length,
+      duplicateRows: analysis.plan.duplicateRows,
+    };
+
+    return Response.json(response);
+  } catch (cause) {
+    return errorResponse(cause);
   }
-
-  if (analysis.plan.validRows === 0) {
-    return Response.json(
-      { error: "no_valid_rows", counts: analysis.preview.counts },
-      { status: 400 },
-    );
-  }
-
-  const result = applyImportPlan(analysis.plan);
-
-  const response: ImportCommitResponse = {
-    inserted: result.inserted,
-    updated: result.updated,
-    unchanged: analysis.plan.unchanged,
-    preserved: analysis.plan.preserved,
-    skippedErrors: analysis.preview.errors.length,
-    duplicateRows: analysis.plan.duplicateRows,
-  };
-
-  return Response.json(response);
 }

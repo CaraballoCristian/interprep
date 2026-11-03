@@ -1,4 +1,7 @@
-import { validateCardInput } from "@lib/library/card-input";
+import {
+  validateCardInput,
+  type CardInput,
+} from "@lib/library/card-input";
 import {
   exportCardsCsv,
   exportCardsJson,
@@ -11,6 +14,7 @@ import {
   type LibraryFilter,
 } from "@lib/library/filter";
 import type { LibraryCard } from "@lib/library/types";
+import type { DeckSummary } from "@lib/decks/types";
 import { matchKey } from "@lib/normalize";
 import type { CardStatus } from "@lib/types";
 import {
@@ -24,11 +28,14 @@ import {
   updateCardHidden,
   type LibraryCardInput,
 } from "@/db/repositories/cards";
+import { listDeckSummaries } from "@/db/repositories/decks";
+import { DeckError, resolveDeckId } from "./decks";
 
 export type LibraryView = {
   filter: LibraryFilter;
   cards: LibraryCard[];
   categories: string[];
+  decks: DeckSummary[];
   total: number;
   visible: number;
   hidden: number;
@@ -45,6 +52,7 @@ export type ExportFile = {
 
 export type LibraryErrorCode =
   | "not_found"
+  | "deck_not_found"
   | "duplicate_card"
   | "terms_required"
   | "invalid_status"
@@ -65,6 +73,7 @@ export class LibraryError extends Error {
 export function parseLibraryFilter(params: URLSearchParams): LibraryFilter {
   return normalizeLibraryFilter({
     search: params.get("search") ?? "",
+    deckId: params.get("deck"),
     category: params.get("category"),
     status: (params.get("status") ?? undefined) as CardStatus | undefined,
     hidden: (params.get("hidden") ?? undefined) as HiddenFilter | undefined,
@@ -76,11 +85,13 @@ export function getLibraryView(
 ): LibraryView {
   const all = listLibraryCards();
   const cards = filterCards(all, filter);
+  const decks = listDeckSummaries();
 
   return {
     filter,
     cards,
-    categories: listCategories(),
+    categories: listCategories(filter.deckId ? [filter.deckId] : null),
+    decks,
     total: all.length,
     visible: all.filter((card) => !card.hidden).length,
     hidden: all.filter((card) => card.hidden).length,
@@ -88,7 +99,7 @@ export function getLibraryView(
   };
 }
 
-function requireCardInput(value: unknown): LibraryCardInput {
+function requireCardInput(value: unknown): CardInput {
   const result = validateCardInput(value);
   if (!result.ok) {
     throw new LibraryError(result.error);
@@ -96,11 +107,30 @@ function requireCardInput(value: unknown): LibraryCardInput {
   return result.card;
 }
 
+function readDeckId(value: unknown): unknown {
+  return typeof value === "object" && value !== null && "deckId" in value
+    ? (value as { deckId?: unknown }).deckId
+    : undefined;
+}
+
+function requireDeck(value: unknown): string {
+  try {
+    return resolveDeckId(value);
+  } catch (cause) {
+    if (cause instanceof DeckError) {
+      throw new LibraryError("deck_not_found");
+    }
+    throw cause;
+  }
+}
+
 function requireUniqueTerms(
-  input: LibraryCardInput,
+  deckId: string,
+  input: Pick<LibraryCardInput, "termEng" | "termEsp">,
   excludeId?: string,
 ): void {
   const existing = findCardByMatchKey(
+    deckId,
     matchKey(input.termEng, input.termEsp),
     excludeId,
   );
@@ -113,11 +143,13 @@ function requireUniqueTerms(
 /** Creates a visible card. History and counters start empty. */
 export function createCardFromInput(input: unknown): LibraryCard {
   const card = requireCardInput(input);
-  requireUniqueTerms(card);
-  return createCard(card);
+  const deckId = requireDeck(readDeckId(input));
+  requireUniqueTerms(deckId, card);
+  return createCard({ ...card, deckId });
 }
 
 export type CardPatch = {
+  deckId?: unknown;
   termEng?: unknown;
   termEsp?: unknown;
   category?: unknown;
@@ -147,13 +179,15 @@ export function updateCardFromInput(
     "status",
   ] as const;
   const hasContent = contentKeys.some((key) => patch[key] !== undefined);
+  const hasDeck = patch.deckId !== undefined;
   const hasHidden = patch.hidden !== undefined;
 
-  if (!hasContent && !hasHidden) {
+  if (!hasContent && !hasDeck && !hasHidden) {
     throw new LibraryError("empty_update");
   }
 
-  if (hasContent) {
+  if (hasContent || hasDeck) {
+    const deckId = hasDeck ? requireDeck(patch.deckId) : existing.deckId;
     const merged = requireCardInput({
       termEng: patch.termEng ?? existing.termEng,
       termEsp: patch.termEsp ?? existing.termEsp,
@@ -162,8 +196,8 @@ export function updateCardFromInput(
       status: patch.status ?? existing.status,
     });
 
-    requireUniqueTerms(merged, id);
-    updateCard(id, merged);
+    requireUniqueTerms(deckId, merged, id);
+    updateCard(id, { ...merged, deckId });
   }
 
   if (hasHidden) {
@@ -207,18 +241,21 @@ export function buildExport(
   now = new Date(),
 ): ExportFile {
   const cards = filterCards(listLibraryCards(), DEFAULT_LIBRARY_FILTER);
+  const deckNames = new Map(
+    listDeckSummaries().map((deck) => [deck.id, deck.name]),
+  );
   const stamp = now.toISOString().slice(0, 10);
 
   if (format === "json") {
     return {
-      body: exportCardsJson(cards, now.toISOString()),
+      body: exportCardsJson(cards, now.toISOString(), deckNames),
       contentType: "application/json; charset=utf-8",
       filename: `interprep-cards-${stamp}.json`,
     };
   }
 
   return {
-    body: exportCardsCsv(cards),
+    body: exportCardsCsv(cards, deckNames),
     contentType: "text/csv; charset=utf-8",
     filename: `interprep-cards-${stamp}.csv`,
   };

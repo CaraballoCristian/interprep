@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import type { DeckSummary } from "@lib/decks/types";
 import type { TranslationKey } from "@lib/i18n/dictionary";
 import { toggleSideField } from "@lib/study/config";
 import type { StudyConfig } from "@lib/study/types";
@@ -12,6 +13,7 @@ import {
   type CardStatus,
   type SideField,
 } from "@lib/types";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PageHeading } from "@/components/page-heading";
 import { useI18n } from "@/components/settings-provider";
 
@@ -40,11 +42,20 @@ type FiltersView = {
   config: StudyConfig;
   templateId: string | null;
   categories: string[];
+  categoriesByDeck: Record<string, string[]>;
+  decks: DeckSummary[];
   templates: TemplateView[];
   cardCount: number;
   deckCount: number;
   sessionActive: boolean;
 };
+
+type ConfirmState =
+  | { kind: "apply" }
+  | { kind: "overwrite"; template: TemplateView }
+  | { kind: "delete-template"; template: TemplateView }
+  | { kind: "delete-deck"; deck: DeckSummary }
+  | null;
 
 type Translate = (
   key: TranslationKey,
@@ -57,6 +68,84 @@ function readJson(response: Response): Promise<unknown> {
 
 function categoryLabel(category: string, t: Translate): string {
   return category === "" ? t("filters.uncategorized") : category;
+}
+
+/** Union of the categories present in the selected decks. */
+function categoriesForDecks(
+  deckIds: readonly string[] | null,
+  categoriesByDeck: Readonly<Record<string, string[]>>,
+  allDeckIds: readonly string[],
+): string[] {
+  const selected = deckIds === null ? allDeckIds : deckIds;
+  const categories = new Set<string>();
+
+  for (const deckId of selected) {
+    for (const category of categoriesByDeck[deckId] ?? []) {
+      categories.add(category);
+    }
+  }
+
+  return [...categories].sort((a, b) => a.localeCompare(b, "es"));
+}
+
+/**
+ * Drops categories that are no longer available. When every available
+ * category is selected the config goes back to `null` ("all").
+ */
+function pruneCategories(
+  categories: string[] | null,
+  available: readonly string[],
+): string[] | null {
+  if (categories === null) {
+    return null;
+  }
+
+  const next = categories.filter((category) => available.includes(category));
+  if (available.length > 0 && next.length === available.length) {
+    return null;
+  }
+
+  return next;
+}
+
+function deckSummary(
+  deckIds: string[] | null,
+  deckCount: number,
+  t: Translate,
+): string {
+  if (deckIds === null) {
+    return deckCount > 0
+      ? t("deck.summaryAll", { count: deckCount })
+      : t("deck.summaryAllPlain");
+  }
+
+  if (deckIds.length === 0) {
+    return t("deck.summaryNone");
+  }
+
+  return t("deck.summaryCount", {
+    selected: deckIds.length,
+    total: deckCount,
+  });
+}
+
+function decksLabel(
+  deckIds: string[] | null,
+  decks: readonly DeckSummary[],
+  t: Translate,
+): string {
+  if (deckIds === null) {
+    return t("deck.summaryAllPlain");
+  }
+
+  if (deckIds.length === 0) {
+    return t("deck.summaryNone");
+  }
+
+  const names = new Map(decks.map((deck) => [deck.id, deck.name]));
+  return deckIds
+    .map((id) => names.get(id) ?? t("deck.error.notFound"))
+    .join(", ");
 }
 
 function sideLabel(side: SideField[], t: Translate): string {
@@ -92,6 +181,10 @@ export default function FiltersPage() {
   const [templateName, setTemplateName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [deckName, setDeckName] = useState("");
+  const [editingDeckId, setEditingDeckId] = useState<string | null>(null);
+  const [editingDeckName, setEditingDeckName] = useState("");
+  const [pendingConfirm, setPendingConfirm] = useState<ConfirmState>(null);
 
   const readError = useCallback(
     (body: unknown): string => {
@@ -109,6 +202,8 @@ export default function FiltersPage() {
           return t("filters.error.duplicateName");
         case "empty_update":
           return t("filters.error.emptyUpdate");
+        case "last_deck":
+          return t("deck.error.last");
         case "not_found":
           return t("filters.error.notFound");
         case "invalid_input":
@@ -156,14 +251,23 @@ export default function FiltersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const refreshMeta = useCallback(async () => {
+  const refreshMeta = useCallback(async (): Promise<FiltersView> => {
     const response = await fetch("/api/session", { cache: "no-store" });
     const body = await readJson(response);
     if (!response.ok) {
       throw new Error(readError(body));
     }
-    setData(body as FiltersView);
+    const view = body as FiltersView;
+    setData(view);
+    return view;
   }, [readError]);
+
+  const allDeckIds = data?.decks.map((deck) => deck.id) ?? [];
+  const availableCategories = categoriesForDecks(
+    config?.deckIds ?? null,
+    data?.categoriesByDeck ?? {},
+    allDeckIds,
+  );
 
   async function run(action: () => Promise<void>) {
     if (busy) {
@@ -228,7 +332,7 @@ export default function FiltersPage() {
   }
 
   function toggleCategory(category: string) {
-    const all = data?.categories ?? [];
+    const all = availableCategories;
 
     setConfig((current) => {
       if (!current) {
@@ -266,23 +370,91 @@ export default function FiltersPage() {
     setConfig((current) => (current ? { ...current, categories: [] } : current));
   }
 
+  function toggleDeck(deckId: string) {
+    setConfig((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const selected = new Set(
+        current.deckIds === null ? allDeckIds : current.deckIds,
+      );
+
+      if (selected.has(deckId)) {
+        selected.delete(deckId);
+      } else {
+        selected.add(deckId);
+      }
+
+      const deckIds =
+        allDeckIds.length > 0 && selected.size === allDeckIds.length
+          ? null
+          : allDeckIds.filter((id) => selected.has(id));
+      const available = categoriesForDecks(
+        deckIds,
+        data?.categoriesByDeck ?? {},
+        allDeckIds,
+      );
+
+      return {
+        ...current,
+        deckIds,
+        categories: pruneCategories(current.categories, available),
+      };
+    });
+  }
+
+  function selectAllDecks() {
+    setConfig((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const available = categoriesForDecks(
+        null,
+        data?.categoriesByDeck ?? {},
+        allDeckIds,
+      );
+
+      return {
+        ...current,
+        deckIds: null,
+        categories: pruneCategories(current.categories, available),
+      };
+    });
+  }
+
+  function selectNoDecks() {
+    setConfig((current) =>
+      current ? { ...current, deckIds: [], categories: [] } : current,
+    );
+  }
+
   function applyConfig() {
     if (!config) {
       return;
     }
 
-    if (
-      data?.sessionActive &&
-      !window.confirm(t("filters.confirm.applyWithSession"))
-    ) {
+    if (data?.sessionActive) {
+      setPendingConfirm({ kind: "apply" });
       return;
     }
+
+    runApply();
+  }
+
+  function runApply() {
+    if (!config) {
+      return;
+    }
+
+    const current = config;
 
     void run(async () => {
       const response = await fetch("/api/session", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config }),
+        body: JSON.stringify({ config: current }),
       });
       const body = await readJson(response);
 
@@ -374,15 +546,21 @@ export default function FiltersPage() {
       return;
     }
 
-    if (!window.confirm(t("filters.confirm.overwrite", { name: template.name }))) {
+    setPendingConfirm({ kind: "overwrite", template });
+  }
+
+  function runOverwriteTemplate(template: TemplateView) {
+    if (!config) {
       return;
     }
+
+    const current = config;
 
     void run(async () => {
       const response = await fetch(`/api/templates/${template.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config }),
+        body: JSON.stringify({ config: current }),
       });
       const body = await readJson(response);
 
@@ -396,10 +574,10 @@ export default function FiltersPage() {
   }
 
   function deleteTemplate(template: TemplateView) {
-    if (!window.confirm(t("filters.confirm.delete", { name: template.name }))) {
-      return;
-    }
+    setPendingConfirm({ kind: "delete-template", template });
+  }
 
+  function runDeleteTemplate(template: TemplateView) {
     void run(async () => {
       const response = await fetch(`/api/templates/${template.id}`, {
         method: "DELETE",
@@ -416,6 +594,140 @@ export default function FiltersPage() {
       setNotice(t("filters.notice.deleted"));
       await refreshMeta();
     });
+  }
+
+  function createDeck(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (deckName.trim() === "") {
+      return;
+    }
+
+    void run(async () => {
+      const response = await fetch("/api/decks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: deckName }),
+      });
+      const body = await readJson(response);
+
+      if (!response.ok) {
+        throw new Error(readError(body));
+      }
+
+      setDeckName("");
+      setNotice(t("deck.notice.created"));
+      await refreshMeta();
+    });
+  }
+
+  function startDeckRename(deck: DeckSummary) {
+    setEditingDeckId(deck.id);
+    setEditingDeckName(deck.name);
+    setError(null);
+    setNotice(null);
+  }
+
+  function cancelDeckRename() {
+    setEditingDeckId(null);
+    setEditingDeckName("");
+  }
+
+  function submitDeckRename(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingDeckId || editingDeckName.trim() === "") {
+      return;
+    }
+
+    const id = editingDeckId;
+
+    void run(async () => {
+      const response = await fetch(`/api/decks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editingDeckName }),
+      });
+      const body = await readJson(response);
+
+      if (!response.ok) {
+        throw new Error(readError(body));
+      }
+
+      cancelDeckRename();
+      setNotice(t("deck.notice.renamed"));
+      await refreshMeta();
+    });
+  }
+
+  function requestDeleteDeck(deck: DeckSummary) {
+    setPendingConfirm({ kind: "delete-deck", deck });
+  }
+
+  function runDeleteDeck(deck: DeckSummary) {
+    void run(async () => {
+      const response = await fetch(`/api/decks/${deck.id}`, {
+        method: "DELETE",
+      });
+      const body = await readJson(response);
+
+      if (!response.ok) {
+        throw new Error(readError(body));
+      }
+
+      if (editingDeckId === deck.id) {
+        cancelDeckRename();
+      }
+
+      const view = await refreshMeta();
+      const remainingIds = view.decks.map((item) => item.id);
+
+      setConfig((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const deckIds =
+          current.deckIds === null
+            ? null
+            : current.deckIds.filter((id) => remainingIds.includes(id));
+        const available = categoriesForDecks(
+          deckIds,
+          view.categoriesByDeck,
+          remainingIds,
+        );
+
+        return {
+          ...current,
+          deckIds,
+          categories: pruneCategories(current.categories, available),
+        };
+      });
+
+      setNotice(t("deck.notice.deleted"));
+    });
+  }
+
+  function confirmPending() {
+    const pending = pendingConfirm;
+    setPendingConfirm(null);
+
+    if (!pending) {
+      return;
+    }
+
+    switch (pending.kind) {
+      case "apply":
+        runApply();
+        break;
+      case "overwrite":
+        runOverwriteTemplate(pending.template);
+        break;
+      case "delete-template":
+        runDeleteTemplate(pending.template);
+        break;
+      case "delete-deck":
+        runDeleteDeck(pending.deck);
+        break;
+    }
   }
 
   if (loading && !data) {
@@ -442,7 +754,7 @@ export default function FiltersPage() {
     );
   }
 
-  const categoriesAll = data.categories;
+  const categoriesAll = availableCategories;
   const selectedCategories =
     config.categories === null
       ? new Set(categoriesAll)
@@ -464,6 +776,12 @@ export default function FiltersPage() {
             selected: config.categories.length,
             total: categoriesAll.length,
           });
+
+  const currentDeckSummary = deckSummary(
+    config.deckIds,
+    data.decks.length,
+    t,
+  );
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6">
@@ -569,6 +887,89 @@ export default function FiltersPage() {
               {t("filters.sidesInvalid")}
             </p>
           )}
+        </section>
+
+        <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-semibold">{t("deck.title")}</h2>
+            <span className="text-xs text-muted">{currentDeckSummary}</span>
+          </div>
+          <p className="text-sm text-muted">{t("filters.decksDescription")}</p>
+
+          <details className="rounded-xl border border-border bg-background">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-medium">
+              <span className="flex items-center gap-2">
+                <span aria-hidden="true" className="text-muted">
+                  ▾
+                </span>
+                {t("deck.choose")}
+              </span>
+              <span className="text-xs font-normal text-muted">
+                {currentDeckSummary}
+              </span>
+            </summary>
+
+            <div className="space-y-2 border-t border-border p-3">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={selectAllDecks}
+                  disabled={busy}
+                  className="min-h-12 rounded-xl border border-border text-sm font-medium disabled:opacity-50"
+                >
+                  {t("filters.all")}
+                </button>
+                <button
+                  type="button"
+                  onClick={selectNoDecks}
+                  disabled={busy}
+                  className="min-h-12 rounded-xl border border-border text-sm font-medium disabled:opacity-50"
+                >
+                  {t("filters.none")}
+                </button>
+              </div>
+
+              {data.decks.length === 0 ? (
+                <p className="px-2 py-3 text-sm text-muted">
+                  {t("deck.empty")}
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {data.decks.map((deck) => {
+                    const checked =
+                      config.deckIds === null ||
+                      config.deckIds.includes(deck.id);
+
+                    return (
+                      <label
+                        key={deck.id}
+                        className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg px-2"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-5 w-5"
+                          checked={checked}
+                          disabled={busy}
+                          onChange={() => toggleDeck(deck.id)}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm">
+                          {deck.name}
+                        </span>
+                        <span className="text-xs text-muted">
+                          {t(
+                            deck.cardCount === 1
+                              ? "deck.cardsOne"
+                              : "deck.cards",
+                            { count: deck.cardCount },
+                          )}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </details>
         </section>
 
         <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
@@ -742,6 +1143,124 @@ export default function FiltersPage() {
         <div className="space-y-4">
         <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
           <div>
+            <h2 className="text-lg font-semibold">{t("deck.manageTitle")}</h2>
+            <p className="mt-1 text-sm text-muted">
+              {t("deck.manageDescription")}
+            </p>
+          </div>
+
+          <form onSubmit={createDeck} className="space-y-2">
+            <label htmlFor="deck-name" className="sr-only">
+              {t("deck.nameLabel")}
+            </label>
+            <input
+              id="deck-name"
+              value={deckName}
+              onChange={(event) => setDeckName(event.target.value)}
+              maxLength={80}
+              placeholder={t("deck.namePlaceholder")}
+              className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-accent"
+            />
+            <button
+              type="submit"
+              disabled={busy || deckName.trim() === ""}
+              className="min-h-12 w-full rounded-xl border border-border px-5 text-sm font-semibold disabled:opacity-50"
+            >
+              {t("deck.create")}
+            </button>
+          </form>
+
+          {data.decks.length === 0 ? (
+            <p className="text-sm text-muted">{t("deck.empty")}</p>
+          ) : (
+            <ul className="space-y-2">
+              {data.decks.map((deck) => (
+                <li
+                  key={deck.id}
+                  className="space-y-2 rounded-xl border border-border bg-background p-3"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">
+                        {deck.name}
+                      </p>
+                      <p className="text-xs text-muted">
+                        {t(
+                          deck.cardCount === 1 ? "deck.cardsOne" : "deck.cards",
+                          { count: deck.cardCount },
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startDeckRename(deck)}
+                        disabled={busy}
+                        className="min-h-12 rounded-xl border border-border px-3 text-sm font-medium disabled:opacity-50"
+                      >
+                        {t("deck.rename")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => requestDeleteDeck(deck)}
+                        disabled={busy || data.decks.length <= 1}
+                        title={
+                          data.decks.length <= 1
+                            ? t("deck.error.last")
+                            : undefined
+                        }
+                        className="min-h-12 rounded-xl border border-danger/40 px-3 text-sm font-medium text-danger disabled:opacity-50"
+                      >
+                        {t("deck.delete")}
+                      </button>
+                    </div>
+                  </div>
+
+                  {editingDeckId === deck.id && (
+                    <form onSubmit={submitDeckRename} className="space-y-2">
+                      <label
+                        htmlFor={`deck-rename-${deck.id}`}
+                        className="block text-sm font-medium"
+                      >
+                        {t("deck.nameLabel")}
+                      </label>
+                      <input
+                        id={`deck-rename-${deck.id}`}
+                        value={editingDeckName}
+                        onChange={(event) =>
+                          setEditingDeckName(event.target.value)
+                        }
+                        maxLength={80}
+                        autoFocus
+                        className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-accent"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={busy || editingDeckName.trim() === ""}
+                          className="min-h-12 flex-1 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground disabled:opacity-50"
+                        >
+                          {t("deck.saveName")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelDeckRename}
+                          disabled={busy}
+                          className="min-h-12 flex-1 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
+                        >
+                          {t("common.cancel")}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
+          <div>
             <h2 className="text-lg font-semibold">{t("filters.saveTitle")}</h2>
             <p className="mt-1 text-sm text-muted">
               {t("filters.saveDescription")}
@@ -810,6 +1329,8 @@ export default function FiltersPage() {
                   <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
                     <dt className="text-muted">{t("filters.categories")}</dt>
                     <dd>{categoriesLabel(template.config, t)}</dd>
+                    <dt className="text-muted">{t("deck.title")}</dt>
+                    <dd>{decksLabel(template.config.deckIds, data.decks, t)}</dd>
                     <dt className="text-muted">{t("filters.statuses")}</dt>
                     <dd>{statusesLabel(template.config.statuses, t)}</dd>
                     {template.config.continuous && (
@@ -902,6 +1423,60 @@ export default function FiltersPage() {
         </section>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={pendingConfirm !== null}
+        title={
+          pendingConfirm === null
+            ? ""
+            : pendingConfirm.kind === "apply"
+              ? t("filters.confirm.applyTitle")
+              : pendingConfirm.kind === "overwrite"
+                ? t("filters.confirm.overwriteTitle")
+                : pendingConfirm.kind === "delete-template"
+                  ? t("filters.confirm.deleteTitle")
+                  : t("deck.confirmDeleteTitle")
+        }
+        description={
+          pendingConfirm === null
+            ? undefined
+            : pendingConfirm.kind === "apply"
+              ? t("filters.confirm.applyWithSession")
+              : pendingConfirm.kind === "overwrite"
+                ? t("filters.confirm.overwrite", {
+                    name: pendingConfirm.template.name,
+                  })
+                : pendingConfirm.kind === "delete-template"
+                  ? t("filters.confirm.delete", {
+                      name: pendingConfirm.template.name,
+                    })
+                  : t("deck.confirmDelete", {
+                      name: pendingConfirm.deck.name,
+                      count: pendingConfirm.deck.cardCount,
+                    })
+        }
+        confirmLabel={
+          pendingConfirm === null
+            ? ""
+            : pendingConfirm.kind === "apply"
+              ? t("filters.apply")
+              : pendingConfirm.kind === "overwrite"
+                ? t("filters.overwrite")
+                : pendingConfirm.kind === "delete-template"
+                  ? t("filters.delete")
+                  : t("deck.delete")
+        }
+        tone={
+          pendingConfirm !== null &&
+          (pendingConfirm.kind === "delete-template" ||
+            pendingConfirm.kind === "delete-deck")
+            ? "danger"
+            : "default"
+        }
+        busy={busy}
+        onConfirm={confirmPending}
+        onCancel={() => setPendingConfirm(null)}
+      />
     </main>
   );
 }

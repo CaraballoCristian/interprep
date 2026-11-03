@@ -40,10 +40,24 @@ const updatedAt = () =>
     .notNull()
     .$defaultFn(() => new Date().toISOString());
 
+export const decks = sqliteTable(
+  "decks",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [uniqueIndex("decks_name_unique").on(table.name)],
+);
+
 export const cards = sqliteTable(
   "cards",
   {
     id: text("id").primaryKey(),
+    deckId: text("deck_id")
+      .notNull()
+      .references(() => decks.id, { onDelete: "cascade" }),
     category: text("category").notNull(),
     termEng: text("term_eng").notNull(),
     termEsp: text("term_esp").notNull(),
@@ -62,7 +76,8 @@ export const cards = sqliteTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex("cards_match_key_unique").on(table.matchKey),
+    uniqueIndex("cards_deck_match_unique").on(table.deckId, table.matchKey),
+    index("cards_deck_idx").on(table.deckId),
     index("cards_category_idx").on(table.category),
     index("cards_status_idx").on(table.status),
     index("cards_hidden_idx").on(table.hidden),
@@ -78,6 +93,8 @@ export const templates = sqliteTable(
     sideB: text("side_b", { mode: "json" }).$type<SideField[]>().notNull(),
     /** null means "all categories". */
     categories: text("categories", { mode: "json" }).$type<string[]>(),
+    /** null means "all decks", including decks created later. */
+    deckIds: text("deck_ids", { mode: "json" }).$type<string[] | null>(),
     statuses: text("statuses", { mode: "json" })
       .$type<CardStatus[]>()
       .notNull()
@@ -110,6 +127,8 @@ export const sessionState = sqliteTable("session_state", {
   updatedAt: updatedAt(),
 });
 
+export type Deck = typeof decks.$inferSelect;
+export type NewDeck = typeof decks.$inferInsert;
 export type Card = typeof cards.$inferSelect;
 export type NewCard = typeof cards.$inferInsert;
 export type Template = typeof templates.$inferSelect;
