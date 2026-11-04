@@ -6,6 +6,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import type { DictationConfig } from "../../lib/dictation/types";
 import {
   CARD_RESULTS,
   CARD_STATUSES,
@@ -140,6 +141,14 @@ export const settings = sqliteTable(
     lastTemplateId: text("last_template_id").references(() => templates.id, {
       onDelete: "set null",
     }),
+    /** Last Dictado configuration chosen by this user. */
+    dictationConfig: text("dictation_config", { mode: "json" }).$type<
+      DictationConfig | null
+    >(),
+    /** Per-user Gemini key, encrypted with AES-256-GCM. Never sent to clients. */
+    geminiApiKeyEncrypted: text("gemini_api_key_encrypted"),
+    /** Last four characters of the key, safe to display. */
+    geminiKeyHint: text("gemini_key_hint"),
     updatedAt: updatedAt(),
   },
   (table) => [uniqueIndex("settings_user_unique").on(table.userId)],

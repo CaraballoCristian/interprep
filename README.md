@@ -64,6 +64,8 @@ migraciones y se crea la base si no existe.
 | `GOOGLE_CLIENT_ID` | sí | Client ID de Google OAuth. |
 | `GOOGLE_CLIENT_SECRET` | sí | Client secret de Google OAuth. |
 | `ALLOWED_EMAILS` | no | Lista separada por comas. Vacío = registro abierto. |
+| `SECRETS_ENCRYPTION_KEY` | no | Secreto de 32+ caracteres para cifrar las API keys de Gemini de cada usuario. Si falta, se usa `BETTER_AUTH_SECRET`. Rotarlo obliga a cada usuario a reingresar su key. |
+| `GEMINI_MODEL` | no | Modelo de Gemini para Dictado (default `gemini-2.5-flash`). |
 | `APP_PORT` | no | Puerto del host para `docker-compose.yml` (default `3000`). |
 
 En producción, si falta una variable obligatoria o el secreto es demasiado
@@ -99,6 +101,8 @@ volumen nombrado (`interprep_data`) para que funcionen los backups de volumen.
    GOOGLE_CLIENT_ID=<client-id>
    GOOGLE_CLIENT_SECRET=<client-secret>
    ALLOWED_EMAILS=
+   SECRETS_ENCRYPTION_KEY=<secreto-de-32+-caracteres>
+   GEMINI_MODEL=gemini-2.5-flash
    ```
 4. Configurá el dominio en Dokploy y dejá que emita el certificado TLS.
 5. En Google Cloud agregá `https://TU-DOMINIO/api/auth/callback/google`.
@@ -122,6 +126,22 @@ Si en algún momento querés conservar tarjetas locales, exportalas desde la app
 vieja y volvelas a importar con la cuenta nueva usando **Importar**. No copies
 `data/app.db` a producción salvo que sepas exactamente lo que estás haciendo.
 
+## Dictado
+
+La pestaña **Dictado** genera frases completas para practicar interpretación
+usando las tarjetas guardadas de cada usuario.
+
+- Cada usuario ingresa **su propia API key de Gemini** desde la pestaña. Se
+  guarda cifrada con AES-256-GCM (`SECRETS_ENCRYPTION_KEY`) y nunca se devuelve
+  al cliente; solo se muestra `hasApiKey` y los últimos 4 caracteres.
+- No hay key global: una cuenta sin key configurada no puede generar frases.
+- La generación usa solo los términos elegidos, sin historial ni ejemplos, con
+  `thinkingBudget: 0` en Gemini 2.5 para minimizar el consumo de tokens.
+- Probar la key usa `models.get`, que no consume tokens de generación.
+- Límite en memoria: 20 generaciones cada 5 minutos por usuario.
+- Las frases no se guardan como tarjetas; el historial vive en memoria y
+  conserva las últimas 20.
+
 ## Scripts
 
 | comando | descripción |
@@ -144,6 +164,7 @@ vieja y volvelas a importar con la cuenta nueva usando **Importar**. No copies
 | tab | URL | contenido |
 |---|---|---|
 | Estudiar | `/` | tarjeta, métricas, resumen de vuelta |
+| Dictado | `/dictation` | frases completas generadas con tu terminología (Gemini) |
 | Importar | `/import` | pegar/subir CSV o TSV y revisar la vista previa |
 | Filtros | `/filters` | lados A/B, categorías, estados, mazos y plantillas |
 | Biblioteca | `/library` | buscar, crear, editar, ocultar y exportar tarjetas |

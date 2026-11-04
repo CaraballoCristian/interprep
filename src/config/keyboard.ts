@@ -8,8 +8,8 @@ export const KEYBOARD_SHORTCUTS = {
   hard: ["ArrowLeft"],
   learned: ["ArrowUp"],
   new: ["ArrowDown"],
-  hide: ["h", "H"],
-  undo: ["z", "Z"],
+  hide: ["h", "H", "-"],
+  undo: ["z", "Z", "Backspace"],
   help: ["?"],
 } as const;
 

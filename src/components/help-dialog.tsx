@@ -15,8 +15,8 @@ const KEYBOARD_ROWS = [
   { keys: ["←"], label: "study.helpHard" },
   { keys: ["↑"], label: "study.helpLearned" },
   { keys: ["↓"], label: "study.helpNew" },
-  { keys: ["H"], label: "study.helpHide" },
-  { keys: ["Z"], label: "study.helpUndo" },
+  { keys: ["H", "-"], label: "study.helpHide" },
+  { keys: ["Z", "⌫"], label: "study.helpUndo" },
   { keys: ["?"], label: "study.helpHelp" },
 ] as const;
 

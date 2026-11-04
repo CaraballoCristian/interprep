@@ -64,6 +64,7 @@ const es = {
   "nav.import": "Importar",
   "nav.filters": "Filtros",
   "nav.library": "Biblioteca",
+  "nav.dictation": "Dictado",
 
   "import.title": "Importar tarjetas",
   "import.deckLabel": "Mazo de destino",
@@ -175,8 +176,8 @@ const es = {
   "study.tooltip.new":
     "Nueva: no la sabías y vuelve pronto (↓ o deslizá hacia abajo)",
   "study.tooltip.hide":
-    "Ocultar: la saca de las vueltas sin borrarla. Para recuperarla, mostrala de nuevo desde la biblioteca.",
-  "study.tooltip.undo": "Deshacer la última acción (Z)",
+    "Ocultar: la saca de las vueltas sin borrarla. Para recuperarla, mostrala de nuevo desde la biblioteca. (H o -)",
+  "study.tooltip.undo": "Deshacer la última acción (Z o Retroceso)",
   "study.tooltip.newRound":
     "Empezar una vuelta nueva con los mismos filtros",
   "study.tooltip.help": "Ayuda y atajos (?)",
@@ -375,6 +376,118 @@ const es = {
   "library.error.generic": "No se pudo completar la acción.",
   "library.uncategorized": "Sin categoría",
 
+  "dictation.title": "Dictado",
+  "dictation.subtitle":
+    "Practicá interpretación de frases completas con tu terminología.",
+  "dictation.configTitle": "Configuración",
+  "dictation.configSaving": "Guardando…",
+  "dictation.configSaved": "Guardado",
+  "dictation.configSaveError": "No se pudo guardar",
+  "dictation.categoriesTitle": "Categorías",
+  "dictation.chooseCategories": "Elegir categorías",
+  "dictation.all": "Todas",
+  "dictation.none": "Ninguna",
+  "dictation.noCategories": "Todavía no hay categorías con tarjetas.",
+  "dictation.uncategorized": "Sin categoría",
+  "dictation.termCount": "{count} términos",
+  "dictation.categoriesSummaryAll": "Todas ({count})",
+  "dictation.categoriesSummaryNone": "Ninguna",
+  "dictation.categoriesSummaryCount": "{selected} de {total}",
+  "dictation.generalTitle": "Incluir General",
+  "dictation.generalDescription":
+    "Los términos de la categoría General se suman a cada frase.",
+  "dictation.statusesTitle": "Estados",
+  "dictation.statusesEmpty": "Elegí al menos un estado.",
+  "dictation.directionTitle": "Dirección",
+  "dictation.direction.en-es": "Inglés → Español",
+  "dictation.direction.es-en": "Español → Inglés",
+  "dictation.lengthTitle": "Duración",
+  "dictation.length.short": "Corta",
+  "dictation.length.medium": "Media",
+  "dictation.length.long": "Larga",
+  "dictation.lengthTerms": "{count} términos por frase",
+  "dictation.audioTitle": "Audio",
+  "dictation.autoplay": "Reproducir automáticamente",
+  "dictation.listenMode": "Modo escucha",
+  "dictation.listenModeDescription":
+    "Oculta el lado A y muestra ambos lados al revelar.",
+  "dictation.speedTitle": "Velocidad",
+  "dictation.speed.slow": "Lenta",
+  "dictation.speed.normal": "Normal",
+  "dictation.speed.fast": "Rápida",
+  "dictation.timerTitle": "Temporizador de silencio",
+  "dictation.timerDescription":
+    "Solo en modo escucha: empieza cuando termina el audio.",
+  "dictation.timerSeconds": "Segundos",
+  "dictation.timerRange": "Entre {min} y {max} segundos.",
+  "dictation.timer.alert": "¡Tiempo! Revelá la frase.",
+  "dictation.timer.running": "Silencio: {seconds} s",
+  "dictation.timer.armed": "El temporizador empieza al terminar el audio.",
+  "dictation.geminiTitle": "Gemini",
+  "dictation.geminiDescription":
+    "Usá tu propia API key de Google AI Studio. Se guarda cifrada y solo la usa tu cuenta.",
+  "dictation.geminiModel": "Modelo: {model}",
+  "dictation.geminiKeyConfigured": "Configurada (…{hint})",
+  "dictation.geminiKeyMissing": "Sin configurar",
+  "dictation.geminiKeyLabel": "API key",
+  "dictation.geminiKeyPlaceholder": "Pegá tu API key",
+  "dictation.geminiKeySave": "Guardar key",
+  "dictation.geminiKeyTest": "Probar",
+  "dictation.geminiKeyRemove": "Borrar key",
+  "dictation.geminiKeyLink": "Obtener una API key",
+  "dictation.geminiKeySaved": "API key guardada.",
+  "dictation.geminiKeyRemoved": "API key borrada.",
+  "dictation.geminiKeyTestOk": "La key funciona.",
+  "dictation.geminiKeyTestError": "La key no funciona.",
+  "dictation.geminiKeyInvalid": "La API key no es válida.",
+  "dictation.geminiNotConfigured":
+    "Configurá tu API key de Gemini para generar frases.",
+  "dictation.geminiKeyUnreadable":
+    "No se pudo leer la API key guardada. Volvé a ingresarla.",
+  "dictation.scenario": "Escenario: {category}",
+  "dictation.sideA": "Lado A",
+  "dictation.sideB": "Lado B",
+  "dictation.language.en": "Inglés",
+  "dictation.language.es": "Español",
+  "dictation.listenPlaceholder":
+    "Escuchá el audio y revelá cuando estés listo.",
+  "dictation.sideBHidden": "Lado B oculto. Revelá para verlo.",
+  "dictation.play": "Escuchar",
+  "dictation.reveal": "Revelar",
+  "dictation.next": "Siguiente",
+  "dictation.generating": "Generando…",
+  "dictation.undo": "Deshacer ({count})",
+  "dictation.retry": "Reintentar",
+  "dictation.start": "Generar primera frase",
+  "dictation.startHint": "Enter o Espacio para empezar.",
+  "dictation.noPhraseTitle": "Sin frases todavía",
+  "dictation.noPhraseDescription":
+    "Generá una frase para empezar a practicar.",
+  "dictation.audioError": "No se pudo reproducir el audio.",
+  "dictation.audioUnsupported":
+    "Este navegador no soporta la síntesis de voz.",
+  "dictation.shortcuts":
+    "Atajos: ← lenta · ↓ normal · → rápida · ↑ siguiente · Enter/Espacio revelar · Z/Retroceso deshacer",
+  "dictation.warning.generalEmpty":
+    "La categoría General no tiene términos elegibles.",
+  "dictation.warning.categoryEmpty":
+    "La categoría «{category}» no tiene términos elegibles.",
+  "dictation.error.rateLimited":
+    "Demasiadas generaciones. Esperá unos minutos.",
+  "dictation.error.noEligible":
+    "No hay términos elegibles con la configuración actual.",
+  "dictation.error.notEnough":
+    "No hay suficientes términos para el largo elegido.",
+  "dictation.error.generation":
+    "No se pudo generar la frase. Probá de nuevo.",
+  "dictation.error.timeout":
+    "La generación tardó demasiado. Probá de nuevo.",
+  "dictation.error.invalidInput":
+    "La configuración enviada no es válida.",
+  "dictation.error.generic": "Ocurrió un error inesperado.",
+  "dictation.loadError": "No se pudo cargar la configuración.",
+  "dictation.loading": "Cargando…",
+
   "auth.loginTitle": "Entrá a Interprep",
   "auth.loginDescription":
     "Iniciá sesión con Google para guardar tus mazos, tarjetas y progreso.",
@@ -450,6 +563,7 @@ const en: Record<TranslationKey, string> = {
   "nav.import": "Import",
   "nav.filters": "Filters",
   "nav.library": "Library",
+  "nav.dictation": "Dictation",
 
   "import.title": "Import cards",
   "import.deckLabel": "Target deck",
@@ -561,8 +675,8 @@ const en: Record<TranslationKey, string> = {
   "study.tooltip.new":
     "New: you did not know it and it comes back soon (↓ or swipe down)",
   "study.tooltip.hide":
-    "Hide: removes it from rounds without deleting it. To bring it back, show it again from the library.",
-  "study.tooltip.undo": "Undo the last action (Z)",
+    "Hide: removes it from rounds without deleting it. To bring it back, show it again from the library. (H or -)",
+  "study.tooltip.undo": "Undo the last action (Z or Backspace)",
   "study.tooltip.newRound": "Start a new round with the same filters",
   "study.tooltip.help": "Help and shortcuts (?)",
   "study.helpTitle": "Help and shortcuts",
@@ -754,6 +868,117 @@ const en: Record<TranslationKey, string> = {
   "library.error.invalidJson": "The request is not valid.",
   "library.error.generic": "The action could not be completed.",
   "library.uncategorized": "Uncategorized",
+
+  "dictation.title": "Dictation",
+  "dictation.subtitle":
+    "Practice full-phrase interpreting with your own terminology.",
+  "dictation.configTitle": "Settings",
+  "dictation.configSaving": "Saving…",
+  "dictation.configSaved": "Saved",
+  "dictation.configSaveError": "Could not save",
+  "dictation.categoriesTitle": "Categories",
+  "dictation.chooseCategories": "Choose categories",
+  "dictation.all": "All",
+  "dictation.none": "None",
+  "dictation.noCategories": "There are no categories with cards yet.",
+  "dictation.uncategorized": "Uncategorized",
+  "dictation.termCount": "{count} terms",
+  "dictation.categoriesSummaryAll": "All ({count})",
+  "dictation.categoriesSummaryNone": "None",
+  "dictation.categoriesSummaryCount": "{selected} of {total}",
+  "dictation.generalTitle": "Include General",
+  "dictation.generalDescription":
+    "Terms from the General category are added to every phrase.",
+  "dictation.statusesTitle": "Statuses",
+  "dictation.statusesEmpty": "Choose at least one status.",
+  "dictation.directionTitle": "Direction",
+  "dictation.direction.en-es": "English → Spanish",
+  "dictation.direction.es-en": "Spanish → English",
+  "dictation.lengthTitle": "Length",
+  "dictation.length.short": "Short",
+  "dictation.length.medium": "Medium",
+  "dictation.length.long": "Long",
+  "dictation.lengthTerms": "{count} terms per phrase",
+  "dictation.audioTitle": "Audio",
+  "dictation.autoplay": "Play automatically",
+  "dictation.listenMode": "Listen mode",
+  "dictation.listenModeDescription":
+    "Hides side A and shows both sides when revealed.",
+  "dictation.speedTitle": "Speed",
+  "dictation.speed.slow": "Slow",
+  "dictation.speed.normal": "Normal",
+  "dictation.speed.fast": "Fast",
+  "dictation.timerTitle": "Silence timer",
+  "dictation.timerDescription":
+    "Listen mode only: it starts when the audio ends.",
+  "dictation.timerSeconds": "Seconds",
+  "dictation.timerRange": "Between {min} and {max} seconds.",
+  "dictation.timer.alert": "Time is up! Reveal the phrase.",
+  "dictation.timer.running": "Silence: {seconds} s",
+  "dictation.timer.armed": "The timer starts when the audio ends.",
+  "dictation.geminiTitle": "Gemini",
+  "dictation.geminiDescription":
+    "Use your own Google AI Studio API key. It is stored encrypted and only your account uses it.",
+  "dictation.geminiModel": "Model: {model}",
+  "dictation.geminiKeyConfigured": "Configured (…{hint})",
+  "dictation.geminiKeyMissing": "Not configured",
+  "dictation.geminiKeyLabel": "API key",
+  "dictation.geminiKeyPlaceholder": "Paste your API key",
+  "dictation.geminiKeySave": "Save key",
+  "dictation.geminiKeyTest": "Test",
+  "dictation.geminiKeyRemove": "Remove key",
+  "dictation.geminiKeyLink": "Get an API key",
+  "dictation.geminiKeySaved": "API key saved.",
+  "dictation.geminiKeyRemoved": "API key removed.",
+  "dictation.geminiKeyTestOk": "The key works.",
+  "dictation.geminiKeyTestError": "The key does not work.",
+  "dictation.geminiKeyInvalid": "The API key is not valid.",
+  "dictation.geminiNotConfigured":
+    "Set your Gemini API key to generate phrases.",
+  "dictation.geminiKeyUnreadable":
+    "The saved API key could not be read. Enter it again.",
+  "dictation.scenario": "Scenario: {category}",
+  "dictation.sideA": "Side A",
+  "dictation.sideB": "Side B",
+  "dictation.language.en": "English",
+  "dictation.language.es": "Spanish",
+  "dictation.listenPlaceholder":
+    "Listen to the audio and reveal when you are ready.",
+  "dictation.sideBHidden": "Side B is hidden. Reveal it to see it.",
+  "dictation.play": "Listen",
+  "dictation.reveal": "Reveal",
+  "dictation.next": "Next",
+  "dictation.generating": "Generating…",
+  "dictation.undo": "Undo ({count})",
+  "dictation.retry": "Retry",
+  "dictation.start": "Generate first phrase",
+  "dictation.startHint": "Press Enter or Space to start.",
+  "dictation.noPhraseTitle": "No phrases yet",
+  "dictation.noPhraseDescription":
+    "Generate a phrase to start practicing.",
+  "dictation.audioError": "The audio could not be played.",
+  "dictation.audioUnsupported":
+    "This browser does not support speech synthesis.",
+  "dictation.shortcuts":
+    "Shortcuts: ← slow · ↓ normal · → fast · ↑ next · Enter/Space reveal · Z/Backspace undo",
+  "dictation.warning.generalEmpty":
+    "The General category has no eligible terms.",
+  "dictation.warning.categoryEmpty":
+    "The “{category}” category has no eligible terms.",
+  "dictation.error.rateLimited":
+    "Too many generations. Wait a few minutes.",
+  "dictation.error.noEligible":
+    "There are no eligible terms with the current settings.",
+  "dictation.error.notEnough":
+    "There are not enough terms for the selected length.",
+  "dictation.error.generation":
+    "The phrase could not be generated. Try again.",
+  "dictation.error.timeout":
+    "The generation took too long. Try again.",
+  "dictation.error.invalidInput": "The submitted settings are not valid.",
+  "dictation.error.generic": "An unexpected error occurred.",
+  "dictation.loadError": "The settings could not be loaded.",
+  "dictation.loading": "Loading…",
 
   "auth.loginTitle": "Sign in to Interprep",
   "auth.loginDescription":

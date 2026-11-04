@@ -7,7 +7,7 @@ import { SettingsControls } from "./settings-controls";
 import { useI18n } from "./settings-provider";
 import { UserMenu, type SessionUserView } from "./user-menu";
 
-type NavIconName = "study" | "import" | "filters" | "library";
+type NavIconName = "study" | "dictation" | "import" | "filters" | "library";
 
 type NavItem = {
   href: string;
@@ -17,6 +17,7 @@ type NavItem = {
 
 const NAV_ITEMS: readonly NavItem[] = [
   { href: "/", labelKey: "common.study", icon: "study" },
+  { href: "/dictation", labelKey: "nav.dictation", icon: "dictation" },
   { href: "/import", labelKey: "nav.import", icon: "import" },
   { href: "/filters", labelKey: "nav.filters", icon: "filters" },
   { href: "/library", labelKey: "nav.library", icon: "library" },
@@ -45,6 +46,15 @@ function NavIcon({ name }: { name: NavIconName }) {
           <rect x="3" y="6" width="13" height="14" rx="2" />
           <path d="M7 3h10a2 2 0 0 1 2 2v12" />
           <path d="M7 11h5" />
+        </svg>
+      );
+    case "dictation":
+      return (
+        <svg {...props}>
+          <path d="M4 13a8 8 0 0 1 16 0" />
+          <path d="M4 13v3a2 2 0 0 0 2 2h1v-5H6a2 2 0 0 0-2 2z" />
+          <path d="M20 13v3a2 2 0 0 1-2 2h-1v-5h1a2 2 0 0 1 2 2z" />
+          <path d="M17 18a3 3 0 0 1-3 3h-2" />
         </svg>
       );
     case "import":
@@ -154,7 +164,7 @@ export function AppShell({
         aria-label={t("nav.main")}
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
-        <ul className="grid grid-cols-4">
+        <ul className="grid grid-cols-5">
           {NAV_ITEMS.map((item) => {
             const active = isActive(pathname, item.href);
 

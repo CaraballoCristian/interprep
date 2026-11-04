@@ -1,4 +1,13 @@
 import { z } from "zod";
+import {
+  MAX_SILENCE_SECONDS,
+  MIN_SILENCE_SECONDS,
+} from "@lib/dictation/config";
+import {
+  DICTATION_DIRECTIONS,
+  DICTATION_LENGTHS,
+  DICTATION_SPEEDS,
+} from "@lib/dictation/types";
 import { CARD_STATUSES, LANGUAGES, SIDE_FIELDS, THEMES } from "@lib/types";
 
 const columnIndex = z.number().int().min(0).nullable();
@@ -79,4 +88,32 @@ export const exportFormatSchema = z.enum(["csv", "json"]);
 export const settingsUpdateSchema = z.object({
   theme: z.enum(THEMES).optional(),
   language: z.enum(LANGUAGES).optional(),
+});
+
+/**
+ * Shape-only validation for Dictado. Semantic rules (eligible terms, category
+ * warnings) live in the pure domain.
+ */
+export const dictationConfigSchema = z.object({
+  categories: z.array(z.string().max(200)).max(500).nullable(),
+  includeGeneral: z.boolean(),
+  statuses: z.array(z.enum(CARD_STATUSES)).max(CARD_STATUSES.length),
+  direction: z.enum(DICTATION_DIRECTIONS),
+  length: z.enum(DICTATION_LENGTHS),
+  autoplay: z.boolean(),
+  listenMode: z.boolean(),
+  speed: z.enum(DICTATION_SPEEDS),
+  silenceSeconds: z
+    .number()
+    .int()
+    .min(MIN_SILENCE_SECONDS)
+    .max(MAX_SILENCE_SECONDS),
+});
+
+export const dictationGenerateSchema = z.object({
+  config: dictationConfigSchema,
+});
+
+export const dictationKeySchema = z.object({
+  apiKey: z.string().trim().min(10).max(300),
 });

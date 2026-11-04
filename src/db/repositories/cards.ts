@@ -1,5 +1,9 @@
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import type {
+  DictationCard,
+  DictationCategoryInfo,
+} from "@lib/dictation/types";
+import type {
   CardInsert,
   CardUpdate,
   ExistingCard,
@@ -415,4 +419,62 @@ export function deleteCard(userId: string, id: string): boolean {
     .where(and(eq(cards.userId, userId), eq(cards.id, id)))
     .run();
   return result.changes > 0;
+}
+
+/** Minimal projection used by Dictado; hidden cards are filtered in the domain. */
+export function listDictationCards(userId: string): DictationCard[] {
+  return getDb()
+    .select({
+      id: cards.id,
+      category: cards.category,
+      termEng: cards.termEng,
+      termEsp: cards.termEsp,
+      status: cards.status,
+      hidden: cards.hidden,
+    })
+    .from(cards)
+    .where(eq(cards.userId, userId))
+    .all();
+}
+
+/**
+ * Visible card counts per category and status. Categories with only hidden
+ * cards still appear with total 0, so the UI can explain why they yield no
+ * terms instead of silently hiding them.
+ */
+export function listDictationCategories(
+  userId: string,
+): DictationCategoryInfo[] {
+  const rows = getDb()
+    .select({
+      category: cards.category,
+      status: cards.status,
+      hidden: cards.hidden,
+      count: sql<number>`count(*)`,
+    })
+    .from(cards)
+    .where(eq(cards.userId, userId))
+    .groupBy(cards.category, cards.status, cards.hidden)
+    .all();
+
+  const byCategory = new Map<string, DictationCategoryInfo>();
+
+  for (const row of rows) {
+    const info = byCategory.get(row.category) ?? {
+      name: row.category,
+      total: 0,
+      byStatus: { new: 0, easy: 0, hard: 0, learned: 0 },
+    };
+
+    if (!row.hidden) {
+      info.total += row.count;
+      info.byStatus[row.status] += row.count;
+    }
+
+    byCategory.set(row.category, info);
+  }
+
+  return [...byCategory.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, "es"),
+  );
 }

@@ -1,5 +1,6 @@
 import { ForbiddenError, UnauthorizedError } from "./auth";
 import { DeckError } from "./decks";
+import { DictationError } from "./dictation";
 import { LibraryError } from "./library";
 import { StudyError } from "./study";
 import { TemplateError } from "./templates";
@@ -46,6 +47,19 @@ export function errorResponse(cause: unknown): Response {
 
   if (cause instanceof StudyError) {
     return Response.json({ error: cause.code }, { status: 409 });
+  }
+
+  if (cause instanceof DictationError) {
+    const status =
+      cause.code === "rate_limited"
+        ? 429
+        : cause.code === "generation_failed"
+          ? 502
+          : cause.code === "gemini_timeout"
+            ? 504
+            : 400;
+
+    return Response.json({ error: cause.code }, { status });
   }
 
   console.error(cause);
