@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { StudyAction, StudyView } from "@lib/study/session";
 import { spokenSideField } from "@lib/study/config";
-import type { CardStatus } from "@lib/types";
+import type { CardStatus, SideField } from "@lib/types";
 import { useI18n } from "@/components/settings-provider";
 import { HelpDialog } from "@/components/help-dialog";
 import { matchesShortcut } from "@/config/keyboard";
@@ -173,6 +173,39 @@ export default function StudyPage() {
     [act, t, view?.revealed],
   );
 
+  const speakSide = useCallback(
+    (fields: SideField[]) => {
+      if (!view?.card) {
+        return;
+      }
+
+      const field = spokenSideField(fields);
+
+      if (!field) {
+        return;
+      }
+
+      const text =
+        field === "termEng" ? view.card.termEng : view.card.termEsp;
+
+      if (text.trim() !== "") {
+        speak({
+          text,
+          language: field === "termEng" ? "en" : "es",
+        });
+      }
+    },
+    [speak, view],
+  );
+
+  const playCurrentSide = useCallback(() => {
+    if (!view) {
+      return;
+    }
+
+    speakSide(view.flipped ? view.config.sideB : view.config.sideA);
+  }, [speakSide, view]);
+
   const flip = useCallback(() => {
     if (!view || busyRef.current) {
       return;
@@ -182,24 +215,12 @@ export default function StudyPage() {
 
     // Speak before the request so the call stays inside the user gesture
     // (iOS/Safari blocks speech started after an await).
-    if (flippingToB && autoPlaySideB && view.card) {
-      const field = spokenSideField(view.config.sideB);
-
-      if (field) {
-        const text =
-          field === "termEng" ? view.card.termEng : view.card.termEsp;
-
-        if (text.trim() !== "") {
-          speak({
-            text,
-            language: field === "termEng" ? "en" : "es",
-          });
-        }
-      }
+    if (flippingToB && autoPlaySideB) {
+      speakSide(view.config.sideB);
     }
 
     void act({ type: "flip", flipped: !view.flipped });
-  }, [act, autoPlaySideB, speak, view]);
+  }, [act, autoPlaySideB, speakSide, view]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -246,6 +267,12 @@ export default function StudyPage() {
         return;
       }
 
+      if (matchesShortcut(event, "audio")) {
+        event.preventDefault();
+        playCurrentSide();
+        return;
+      }
+
       if (matchesShortcut(event, "flip")) {
         event.preventDefault();
         void flip();
@@ -276,7 +303,7 @@ export default function StudyPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [act, flip, helpOpen, requestStatus, view]);
+  }, [act, flip, helpOpen, playCurrentSide, requestStatus, view]);
 
   if (!view) {
     return (

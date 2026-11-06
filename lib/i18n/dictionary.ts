@@ -199,6 +199,7 @@ const es = {
   "study.helpNew": "Nueva",
   "study.helpHide": "Ocultar",
   "study.helpUndo": "Deshacer",
+  "study.helpAudio": "Reproducir audio",
   "study.helpHelp": "Abrir o cerrar esta ayuda",
   "study.helpKeyboardHint":
     "Los atajos no se activan con Ctrl, Alt o Meta.",
@@ -704,6 +705,7 @@ const en: Record<TranslationKey, string> = {
   "study.helpNew": "New",
   "study.helpHide": "Hide",
   "study.helpUndo": "Undo",
+  "study.helpAudio": "Play audio",
   "study.helpHelp": "Open or close this help",
   "study.helpKeyboardHint":
     "Shortcuts never fire with Ctrl, Alt or Meta held.",

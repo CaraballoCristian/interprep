@@ -10,6 +10,7 @@ export const KEYBOARD_SHORTCUTS = {
   new: ["ArrowDown"],
   hide: ["h", "H", "-"],
   undo: ["z", "Z", "Backspace"],
+  audio: ["0", "r", "R"],
   help: ["?"],
 } as const;
 
