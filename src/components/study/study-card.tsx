@@ -7,6 +7,7 @@ import type {
   StudyCard as StudyCardModel,
   StudyConfig,
 } from "@lib/study/types";
+import { orderSideFields } from "@lib/study/config";
 import type { TranslationKey } from "@lib/i18n/dictionary";
 import { type CardResult, type CardStatus, type SideField } from "@lib/types";
 import { useI18n } from "@/components/settings-provider";
@@ -325,7 +326,7 @@ export function StudyCardView({
               >
                 <SideContent
                   card={card}
-                  fields={flipped ? config.sideB : config.sideA}
+                  fields={orderSideFields(flipped ? config.sideB : config.sideA)}
                 />
               </motion.div>
             </AnimatePresence>

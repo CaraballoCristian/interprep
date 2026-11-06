@@ -27,3 +27,15 @@ export function toggleSideField(
     [side]: [...config[side], field],
   };
 }
+
+/**
+ * Puts the description last while keeping the chosen order of the remaining
+ * fields. Sides are stored in click order, so this guarantees translations are
+ * always shown above the description regardless of how the config was built.
+ */
+export function orderSideFields(fields: readonly SideField[]): SideField[] {
+  return [
+    ...fields.filter((field) => field !== "description"),
+    ...fields.filter((field) => field === "description"),
+  ];
+}

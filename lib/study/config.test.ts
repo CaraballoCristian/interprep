@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { toggleSideField } from "./config";
+import { orderSideFields, toggleSideField } from "./config";
 import type { StudyConfig } from "./types";
+import type { SideField } from "../types";
 
 function config(sideA: StudyConfig["sideA"], sideB: StudyConfig["sideB"]): StudyConfig {
   return {
@@ -81,5 +82,36 @@ describe("toggleSideField", () => {
 
     expect(input.sideA).toEqual(["termEng"]);
     expect(input.sideB).toEqual([]);
+  });
+});
+
+describe("orderSideFields", () => {
+  it("puts the description last when it was selected first", () => {
+    expect(orderSideFields(["description", "termEsp"])).toEqual([
+      "termEsp",
+      "description",
+    ]);
+  });
+
+  it("keeps the remaining fields in their chosen order", () => {
+    expect(orderSideFields(["description", "termEsp", "termEng"])).toEqual([
+      "termEsp",
+      "termEng",
+      "description",
+    ]);
+  });
+
+  it("leaves sides without a description untouched", () => {
+    expect(orderSideFields(["termEsp", "termEng"])).toEqual([
+      "termEsp",
+      "termEng",
+    ]);
+  });
+
+  it("does not mutate the input array", () => {
+    const input: SideField[] = ["description", "termEsp"];
+    orderSideFields(input);
+
+    expect(input).toEqual(["description", "termEsp"]);
   });
 });
