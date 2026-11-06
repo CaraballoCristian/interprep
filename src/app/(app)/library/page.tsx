@@ -4,10 +4,15 @@ import Link from "next/link";
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
-import type { HiddenFilter, LibraryFilter } from "@lib/library/filter";
+import {
+  withFastMode,
+  type HiddenFilter,
+  type LibraryFilter,
+} from "@lib/library/filter";
 import type { LibraryCard } from "@lib/library/types";
 import type { DeckSummary } from "@lib/decks/types";
 import type { TranslationKey } from "@lib/i18n/dictionary";
@@ -258,7 +263,9 @@ export default function LibraryPage() {
   const [category, setCategory] = useState<string | null>(null);
   const [status, setStatus] = useState<CardStatus | null>(null);
   const [hidden, setHidden] = useState<HiddenFilter>("all");
+  const [fastMode, setFastMode] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const [creating, setCreating] = useState(false);
   const [createDraft, setCreateDraft] = useState<CardDraft>(EMPTY_DRAFT);
@@ -296,24 +303,39 @@ export default function LibraryPage() {
     }
   }
 
+  const requestFilter = useMemo(
+    () =>
+      withFastMode(
+        { search, deckId, category, status, hidden },
+        fastMode,
+      ),
+    [search, deckId, category, status, hidden, fastMode],
+  );
+
+  useEffect(() => {
+    if (fastMode) {
+      searchRef.current?.focus();
+    }
+  }, [fastMode]);
+
   useEffect(() => {
     const controller = new AbortController();
 
     const timer = setTimeout(() => {
       const params = new URLSearchParams();
-      if (search.trim() !== "") {
-        params.set("search", search.trim());
+      if (requestFilter.search.trim() !== "") {
+        params.set("search", requestFilter.search.trim());
       }
-      if (deckId !== null) {
-        params.set("deck", deckId);
+      if (requestFilter.deckId !== null) {
+        params.set("deck", requestFilter.deckId);
       }
-      if (category !== null) {
-        params.set("category", category);
+      if (requestFilter.category !== null) {
+        params.set("category", requestFilter.category);
       }
-      if (status !== null) {
-        params.set("status", status);
+      if (requestFilter.status !== null) {
+        params.set("status", requestFilter.status);
       }
-      params.set("hidden", hidden);
+      params.set("hidden", requestFilter.hidden);
 
       setLoading(true);
 
@@ -348,14 +370,14 @@ export default function LibraryPage() {
             setLoading(false);
           }
         });
-    }, 250);
+    }, fastMode ? 100 : 250);
 
     return () => {
       controller.abort();
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, deckId, category, status, hidden, refreshKey]);
+  }, [requestFilter, fastMode, refreshKey]);
 
   const refresh = () => setRefreshKey((key) => key + 1);
 
@@ -606,7 +628,7 @@ export default function LibraryPage() {
             <h2 className="text-lg font-semibold">
               {t("library.searchTitle")}
             </h2>
-            {hasFilters && (
+            {!fastMode && hasFilters && (
               <button
                 type="button"
                 onClick={clearFilters}
@@ -618,6 +640,29 @@ export default function LibraryPage() {
             )}
           </div>
 
+          <label
+            className={`flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 ${
+              fastMode
+                ? "border-accent bg-accent/10"
+                : "border-border bg-background"
+            }`}
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">
+                {t("library.fastMode")}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted">
+                {t("library.fastModeDescription")}
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              className="h-5 w-5 shrink-0"
+              checked={fastMode}
+              onChange={(event) => setFastMode(event.target.checked)}
+            />
+          </label>
+
           <div>
             <label
               htmlFor="library-search"
@@ -626,130 +671,141 @@ export default function LibraryPage() {
               {t("library.searchLabel")}
             </label>
             <input
+              ref={searchRef}
               id="library-search"
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t("library.searchPlaceholder")}
               autoComplete="off"
+              enterKeyHint="search"
               className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
             />
+            {fastMode && (
+              <p className="mt-1 text-xs text-muted">
+                {t("library.fastModeActive")}
+              </p>
+            )}
           </div>
 
-          <div>
-            <label
-              htmlFor="library-deck"
-              className="mb-1 block text-sm font-medium"
-            >
-              {t("library.deckLabel")}
-            </label>
-            <select
-              id="library-deck"
-              value={deckId === null ? ALL_DECKS : deckId}
-              onChange={(event) =>
-                setDeckId(
-                  event.target.value === ALL_DECKS
-                    ? null
-                    : event.target.value,
-                )
-              }
-              className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
-            >
-              <option value={ALL_DECKS}>{t("library.allDecks")}</option>
-              {decks.map((deck) => (
-                <option key={deck.id} value={deck.id}>
-                  {deck.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!fastMode && (
+            <>
+              <div>
+                <label
+                  htmlFor="library-deck"
+                  className="mb-1 block text-sm font-medium"
+                >
+                  {t("library.deckLabel")}
+                </label>
+                <select
+                  id="library-deck"
+                  value={deckId === null ? ALL_DECKS : deckId}
+                  onChange={(event) =>
+                    setDeckId(
+                      event.target.value === ALL_DECKS
+                        ? null
+                        : event.target.value,
+                    )
+                  }
+                  className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
+                >
+                  <option value={ALL_DECKS}>{t("library.allDecks")}</option>
+                  {decks.map((deck) => (
+                    <option key={deck.id} value={deck.id}>
+                      {deck.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="library-category"
-                className="mb-1 block text-sm font-medium"
-              >
-                {t("library.categoryLabel")}
-              </label>
-              <select
-                id="library-category"
-                value={category === null ? ALL_CATEGORIES : category}
-                onChange={(event) =>
-                  setCategory(
-                    event.target.value === ALL_CATEGORIES
-                      ? null
-                      : event.target.value,
-                  )
-                }
-                className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
-              >
-                <option value={ALL_CATEGORIES}>
-                  {t("library.allCategories")}
-                </option>
-                {categoryOptions.map((item) => (
-                  <option key={item || "__empty"} value={item}>
-                    {categoryLabel(item, t)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label
-                htmlFor="library-status"
-                className="mb-1 block text-sm font-medium"
-              >
-                {t("library.statusLabel")}
-              </label>
-              <select
-                id="library-status"
-                value={status ?? ""}
-                onChange={(event) =>
-                  setStatus(
-                    event.target.value === ""
-                      ? null
-                      : (event.target.value as CardStatus),
-                  )
-                }
-                className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
-              >
-                <option value="">{t("library.allStatuses")}</option>
-                {CARD_STATUSES.map((item) => (
-                  <option key={item} value={item}>
-                    {t(STATUS_KEYS[item])}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-1 text-sm font-medium">
-              {t("library.visibility")}
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {HIDDEN_OPTIONS.map((option) => {
-                const selected = hidden === option.value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => setHidden(option.value)}
-                    className={`min-h-12 rounded-xl border text-sm font-medium ${
-                      selected
-                        ? "border-accent bg-accent text-accent-foreground"
-                        : "border-border bg-background"
-                    }`}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="library-category"
+                    className="mb-1 block text-sm font-medium"
                   >
-                    {t(option.key)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                    {t("library.categoryLabel")}
+                  </label>
+                  <select
+                    id="library-category"
+                    value={category === null ? ALL_CATEGORIES : category}
+                    onChange={(event) =>
+                      setCategory(
+                        event.target.value === ALL_CATEGORIES
+                          ? null
+                          : event.target.value,
+                      )
+                    }
+                    className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
+                  >
+                    <option value={ALL_CATEGORIES}>
+                      {t("library.allCategories")}
+                    </option>
+                    {categoryOptions.map((item) => (
+                      <option key={item || "__empty"} value={item}>
+                        {categoryLabel(item, t)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="library-status"
+                    className="mb-1 block text-sm font-medium"
+                  >
+                    {t("library.statusLabel")}
+                  </label>
+                  <select
+                    id="library-status"
+                    value={status ?? ""}
+                    onChange={(event) =>
+                      setStatus(
+                        event.target.value === ""
+                          ? null
+                          : (event.target.value as CardStatus),
+                      )
+                    }
+                    className="min-h-12 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-accent"
+                  >
+                    <option value="">{t("library.allStatuses")}</option>
+                    {CARD_STATUSES.map((item) => (
+                      <option key={item} value={item}>
+                        {t(STATUS_KEYS[item])}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-1 text-sm font-medium">
+                  {t("library.visibility")}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {HIDDEN_OPTIONS.map((option) => {
+                    const selected = hidden === option.value;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setHidden(option.value)}
+                        className={`min-h-12 rounded-xl border text-sm font-medium ${
+                          selected
+                            ? "border-accent bg-accent text-accent-foreground"
+                            : "border-border bg-background"
+                        }`}
+                      >
+                        {t(option.key)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
 
           {loading && (
             <p role="status" className="text-xs text-muted">

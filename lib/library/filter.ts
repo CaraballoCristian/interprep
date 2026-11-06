@@ -23,6 +23,21 @@ export const DEFAULT_LIBRARY_FILTER: LibraryFilter = {
   hidden: "all",
 };
 
+/**
+ * Fast mode keeps only the search term: every other filter is ignored so a
+ * lookup always covers all decks, categories, statuses and hidden cards.
+ */
+export function withFastMode(
+  filter: LibraryFilter,
+  fastMode: boolean,
+): LibraryFilter {
+  if (!fastMode) {
+    return filter;
+  }
+
+  return { ...DEFAULT_LIBRARY_FILTER, search: filter.search };
+}
+
 export function normalizeLibraryFilter(
   input: Partial<LibraryFilter>,
 ): LibraryFilter {

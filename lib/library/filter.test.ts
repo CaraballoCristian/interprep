@@ -4,6 +4,7 @@ import {
   filterCards,
   matchesLibraryFilter,
   normalizeLibraryFilter,
+  withFastMode,
   type LibraryFilter,
 } from "./filter";
 import type { LibraryCard } from "./types";
@@ -262,5 +263,34 @@ describe("matchesLibraryFilter", () => {
     expect(
       matchesLibraryFilter(cards[0], filter({ category: "Court" })),
     ).toBe(false);
+  });
+});
+
+describe("withFastMode", () => {
+  it("returns the same filter when fast mode is off", () => {
+    const current = filter({
+      search: "policy",
+      deckId: "deck-general",
+      category: "Insurance",
+      status: "new",
+      hidden: "visible",
+    });
+
+    expect(withFastMode(current, false)).toBe(current);
+  });
+
+  it("keeps only the search term when fast mode is on", () => {
+    expect(
+      withFastMode(
+        filter({
+          search: "  policy ",
+          deckId: "deck-general",
+          category: "Insurance",
+          status: "new",
+          hidden: "hidden",
+        }),
+        true,
+      ),
+    ).toEqual({ ...DEFAULT_LIBRARY_FILTER, search: "  policy " });
   });
 });
