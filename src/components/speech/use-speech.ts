@@ -1,9 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DictationSpeed } from "@lib/dictation/types";
+import {
+  selectSpeechVoice,
+  speechLanguageTag,
+  type SpeechLanguage,
+} from "@lib/speech/voices";
 
-export const SPEECH_RATES: Record<DictationSpeed, number> = {
+export type SpeechSpeed = "slow" | "normal" | "fast";
+
+export const SPEECH_RATES: Record<SpeechSpeed, number> = {
   slow: 0.7,
   normal: 1,
   fast: 1.3,
@@ -11,28 +17,34 @@ export const SPEECH_RATES: Record<DictationSpeed, number> = {
 
 type SpeakOptions = {
   text: string;
-  language: "en" | "es";
-  speed: DictationSpeed;
+  language: SpeechLanguage;
+  speed?: SpeechSpeed;
   onEnd?: () => void;
   onError?: (reason: string) => void;
 };
 
+function speechSupported(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    "speechSynthesis" in window &&
+    "SpeechSynthesisUtterance" in window
+  );
+}
+
 /**
  * Small wrapper over the browser SpeechSynthesis API. It cancels the previous
  * utterance, picks a voice for the requested language and reports completion
- * so the silence timer can start exactly when the audio ends.
+ * so callers can react when the audio ends.
  */
 export function useSpeech() {
   const [supported, setSupported] = useState(false);
   const currentRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
-    setSupported(
-      typeof window !== "undefined" && "speechSynthesis" in window,
-    );
+    setSupported(speechSupported());
 
     return () => {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      if (currentRef.current && speechSupported()) {
         currentRef.current = null;
         window.speechSynthesis.cancel();
       }
@@ -40,7 +52,7 @@ export function useSpeech() {
   }, []);
 
   const cancel = useCallback(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+    if (!speechSupported()) {
       return;
     }
     currentRef.current = null;
@@ -48,8 +60,14 @@ export function useSpeech() {
   }, []);
 
   const speak = useCallback(
-    ({ text, language, speed, onEnd, onError }: SpeakOptions) => {
-      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+    ({
+      text,
+      language,
+      speed = "normal",
+      onEnd,
+      onError,
+    }: SpeakOptions) => {
+      if (!speechSupported()) {
         onError?.("unsupported");
         return;
       }
@@ -59,21 +77,11 @@ export function useSpeech() {
       synth.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
-      const langCode = language === "en" ? "en" : "es";
-      utterance.lang = language === "en" ? "en-US" : "es-ES";
+      utterance.lang = speechLanguageTag(language);
       utterance.rate = SPEECH_RATES[speed];
       utterance.pitch = 1;
 
-      const voices = synth.getVoices();
-      const voice =
-        voices.find(
-          (candidate) =>
-            candidate.lang.toLowerCase().startsWith(langCode) &&
-            candidate.localService,
-        ) ??
-        voices.find((candidate) =>
-          candidate.lang.toLowerCase().startsWith(langCode),
-        );
+      const voice = selectSpeechVoice(synth.getVoices(), language);
 
       if (voice) {
         utterance.voice = voice;

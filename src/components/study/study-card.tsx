@@ -10,6 +10,7 @@ import type {
 import { orderSideFields } from "@lib/study/config";
 import type { TranslationKey } from "@lib/i18n/dictionary";
 import { type CardResult, type CardStatus, type SideField } from "@lib/types";
+import { SpeakButton } from "@/components/speech/speak-button";
 import { useI18n } from "@/components/settings-provider";
 
 const SWIPE_THRESHOLD = 80;
@@ -77,12 +78,18 @@ function SideContent({
             {value}
           </p>
         ) : (
-          <p
+          <div
             key={field}
-            className="text-3xl font-semibold leading-tight tracking-tight"
+            className="flex items-center justify-center gap-2"
           >
-            {value}
-          </p>
+            <p className="text-3xl font-semibold leading-tight tracking-tight">
+              {value}
+            </p>
+            <SpeakButton
+              text={value}
+              language={field === "termEng" ? "en" : "es"}
+            />
+          </div>
         );
       })}
     </div>

@@ -19,6 +19,7 @@ import type { TranslationKey } from "@lib/i18n/dictionary";
 import { CARD_STATUSES, type CardResult, type CardStatus } from "@lib/types";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PageHeading } from "@/components/page-heading";
+import { SpeakButton } from "@/components/speech/speak-button";
 import { useI18n } from "@/components/settings-provider";
 
 const STATUS_KEYS: Record<CardStatus, TranslationKey> = {
@@ -929,19 +930,25 @@ export default function LibraryPage() {
                 >
                   <div className="min-h-0 flex-1 space-y-3 overflow-hidden">
                     <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className="line-clamp-2 break-words text-lg font-semibold"
-                          title={card.termEng}
-                        >
-                          {card.termEng}
-                        </p>
-                        <p
-                          className="line-clamp-1 break-words text-sm text-muted"
-                          title={card.termEsp}
-                        >
-                          {card.termEsp}
-                        </p>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-start gap-2">
+                          <p
+                            className="min-w-0 flex-1 line-clamp-2 break-words text-lg font-semibold"
+                            title={card.termEng}
+                          >
+                            {card.termEng}
+                          </p>
+                          <SpeakButton text={card.termEng} language="en" />
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <p
+                            className="min-w-0 flex-1 line-clamp-1 break-words text-sm text-muted"
+                            title={card.termEsp}
+                          >
+                            {card.termEsp}
+                          </p>
+                          <SpeakButton text={card.termEsp} language="es" />
+                        </div>
                       </div>
                       <div className="flex flex-wrap items-center justify-end gap-1">
                         <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">

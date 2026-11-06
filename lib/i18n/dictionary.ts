@@ -11,6 +11,8 @@ const es = {
   "common.cancel": "Cancelar",
   "common.save": "Guardar",
   "common.close": "Cerrar",
+  "speech.play": "Escuchar pronunciación",
+  "speech.error": "No se pudo reproducir el audio.",
 
   "deck.label": "Mazo",
   "deck.title": "Mazos",
@@ -513,6 +515,8 @@ const en: Record<TranslationKey, string> = {
   "common.cancel": "Cancel",
   "common.save": "Save",
   "common.close": "Close",
+  "speech.play": "Play pronunciation",
+  "speech.error": "The audio could not be played.",
 
   "deck.label": "Deck",
   "deck.title": "Decks",

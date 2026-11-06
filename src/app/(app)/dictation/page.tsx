@@ -33,7 +33,7 @@ import { PageHeading } from "@/components/page-heading";
 import { useI18n } from "@/components/settings-provider";
 import { DictationConfigPanel } from "@/components/dictation/dictation-config";
 import { DictationSession } from "@/components/dictation/dictation-session";
-import { useSpeech } from "@/components/dictation/use-speech";
+import { useSpeech } from "@/components/speech/use-speech";
 
 function playAlertBeep(context: AudioContext) {
   const oscillator = context.createOscillator();
