@@ -4,12 +4,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { StudyAction, StudyView } from "@lib/study/session";
+import { spokenSideField } from "@lib/study/config";
 import type { CardStatus } from "@lib/types";
 import { useI18n } from "@/components/settings-provider";
 import { HelpDialog } from "@/components/help-dialog";
 import { matchesShortcut } from "@/config/keyboard";
+import { useSpeech } from "@/components/speech/use-speech";
 import { StudyCardView } from "@/components/study/study-card";
 import { SummaryScreen } from "@/components/study/summary-screen";
+
+const AUTO_PLAY_STORAGE_KEY = "interprep.study.autoPlaySideB";
 
 export default function StudyPage() {
   const { t } = useI18n();
@@ -18,8 +22,11 @@ export default function StudyPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [autoPlaySideB, setAutoPlaySideB] = useState(false);
+  const [preferencesReady, setPreferencesReady] = useState(false);
   const busyRef = useRef(false);
   const loadedRef = useRef(false);
+  const { supported, speak } = useSpeech();
 
   const readError = useCallback(
     (data: unknown): string => {
@@ -111,6 +118,35 @@ export default function StudyPage() {
     };
   }, [t]);
 
+  // Auto-play is a client-only preference, so it lives in localStorage instead
+  // of the study session.
+  useEffect(() => {
+    try {
+      setAutoPlaySideB(
+        window.localStorage.getItem(AUTO_PLAY_STORAGE_KEY) === "1",
+      );
+    } catch {
+      // localStorage may be unavailable in private mode.
+    } finally {
+      setPreferencesReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!preferencesReady) {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        AUTO_PLAY_STORAGE_KEY,
+        autoPlaySideB ? "1" : "0",
+      );
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [autoPlaySideB, preferencesReady]);
+
   // Leaving the screen preserves the round and asks to resume on return.
   useEffect(() => {
     return () => {
@@ -136,6 +172,34 @@ export default function StudyPage() {
     },
     [act, t, view?.revealed],
   );
+
+  const flip = useCallback(() => {
+    if (!view || busyRef.current) {
+      return;
+    }
+
+    const flippingToB = !view.flipped;
+
+    // Speak before the request so the call stays inside the user gesture
+    // (iOS/Safari blocks speech started after an await).
+    if (flippingToB && autoPlaySideB && view.card) {
+      const field = spokenSideField(view.config.sideB);
+
+      if (field) {
+        const text =
+          field === "termEng" ? view.card.termEng : view.card.termEsp;
+
+        if (text.trim() !== "") {
+          speak({
+            text,
+            language: field === "termEng" ? "en" : "es",
+          });
+        }
+      }
+    }
+
+    void act({ type: "flip", flipped: !view.flipped });
+  }, [act, autoPlaySideB, speak, view]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -184,7 +248,7 @@ export default function StudyPage() {
 
       if (matchesShortcut(event, "flip")) {
         event.preventDefault();
-        void act({ type: "flip", flipped: !view.flipped });
+        void flip();
         return;
       }
 
@@ -212,7 +276,7 @@ export default function StudyPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [act, helpOpen, requestStatus, view]);
+  }, [act, flip, helpOpen, requestStatus, view]);
 
   if (!view) {
     return (
@@ -233,6 +297,25 @@ export default function StudyPage() {
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-base font-semibold">{t("common.study")}</h1>
           <div className="flex items-center gap-2">
+            {supported && (
+              <button
+                type="button"
+                aria-pressed={autoPlaySideB}
+                aria-label={t("study.autoPlayTooltip")}
+                title={t("study.autoPlayTooltip")}
+                onClick={() => setAutoPlaySideB((value) => !value)}
+                className={`flex h-12 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold ${
+                  autoPlaySideB
+                    ? "border-accent bg-accent/10 text-accent"
+                    : "border-border text-muted"
+                }`}
+              >
+                <span aria-hidden="true">
+                  {autoPlaySideB ? "🔊" : "🔇"}
+                </span>
+                {t("study.autoPlay")}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setHelpOpen(true)}
@@ -331,9 +414,7 @@ export default function StudyPage() {
               flipped={view.flipped}
               revealed={view.revealed}
               busy={busy}
-              onFlip={() =>
-                void act({ type: "flip", flipped: !view.flipped })
-              }
+              onFlip={() => void flip()}
               onHide={() => void act({ type: "hide" })}
               onStatusChange={requestStatus}
               onNotRevealed={() => setError(t("study.error.notRevealed"))}

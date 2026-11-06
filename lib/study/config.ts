@@ -39,3 +39,10 @@ export function orderSideFields(fields: readonly SideField[]): SideField[] {
     ...fields.filter((field) => field === "description"),
   ];
 }
+
+/** The field that should be read aloud: the first non-description field. */
+export function spokenSideField(
+  fields: readonly SideField[],
+): SideField | null {
+  return fields.find((field) => field !== "description") ?? null;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderSideFields, toggleSideField } from "./config";
+import { orderSideFields, spokenSideField, toggleSideField } from "./config";
 import type { StudyConfig } from "./types";
 import type { SideField } from "../types";
 
@@ -113,5 +113,17 @@ describe("orderSideFields", () => {
     orderSideFields(input);
 
     expect(input).toEqual(["description", "termEsp"]);
+  });
+});
+
+describe("spokenSideField", () => {
+  it("skips the description and returns the translation", () => {
+    expect(spokenSideField(["description", "termEsp"])).toBe("termEsp");
+    expect(spokenSideField(["termEng", "description"])).toBe("termEng");
+  });
+
+  it("returns null when the side only has a description", () => {
+    expect(spokenSideField(["description"])).toBeNull();
+    expect(spokenSideField([])).toBeNull();
   });
 });
