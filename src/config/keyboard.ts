@@ -4,10 +4,10 @@
  */
 export const KEYBOARD_SHORTCUTS = {
   flip: [" ", "Enter"],
-  easy: ["ArrowRight"],
-  hard: ["ArrowLeft"],
-  learned: ["ArrowUp"],
-  new: ["ArrowDown"],
+  easy: ["ArrowRight", "d", "D"],
+  hard: ["ArrowLeft", "a", "A"],
+  learned: ["ArrowUp", "w", "W"],
+  new: ["ArrowDown", "s", "S"],
   hide: ["h", "H", "-"],
   undo: ["z", "Z", "Backspace"],
   audio: ["0", "r", "R"],

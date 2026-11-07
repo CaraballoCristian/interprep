@@ -11,10 +11,10 @@ type HelpDialogProps = {
 
 const KEYBOARD_ROWS = [
   { keys: ["space", "Enter"], label: "study.helpFlip" },
-  { keys: ["→"], label: "study.helpEasy" },
-  { keys: ["←"], label: "study.helpHard" },
-  { keys: ["↑"], label: "study.helpLearned" },
-  { keys: ["↓"], label: "study.helpNew" },
+  { keys: ["→", "D"], label: "study.helpEasy" },
+  { keys: ["←", "A"], label: "study.helpHard" },
+  { keys: ["↑", "W"], label: "study.helpLearned" },
+  { keys: ["↓", "S"], label: "study.helpNew" },
   { keys: ["H", "-"], label: "study.helpHide" },
   { keys: ["Z", "⌫"], label: "study.helpUndo" },
   { keys: ["0", "R"], label: "study.helpAudio" },
