@@ -156,7 +156,7 @@ const es = {
   "study.flip": "Girar",
   "study.hintFlipped": "Usá las flechas o deslizá la tarjeta",
   "study.hintUnflipped": "Tocá la tarjeta para ver la respuesta",
-  "study.autoPlay": "Auto B",
+  "study.autoPlay": "Auto",
   "study.autoPlayTooltip":
     "Reproducir el lado B automáticamente al girar la tarjeta",
   "study.undo": "↺ Deshacer ({count})",
@@ -664,7 +664,7 @@ const en: Record<TranslationKey, string> = {
   "study.flip": "Flip",
   "study.hintFlipped": "Use the arrows or swipe the card",
   "study.hintUnflipped": "Tap the card to reveal the answer",
-  "study.autoPlay": "Auto B",
+  "study.autoPlay": "Auto",
   "study.autoPlayTooltip":
     "Play side B automatically when the card is flipped",
   "study.undo": "↺ Undo ({count})",

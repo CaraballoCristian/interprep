@@ -320,43 +320,13 @@ export default function StudyPage() {
 
   return (
     <main className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col overflow-hidden px-3 pb-2 pt-2 md:max-w-2xl md:px-4 md:pb-4 md:pt-4">
-      <header className="shrink-0 space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="text-base font-semibold">{t("common.study")}</h1>
-          <div className="flex items-center gap-1.5">
-            {supported && (
-              <button
-                type="button"
-                aria-pressed={autoPlaySideB}
-                aria-label={t("study.autoPlayTooltip")}
-                title={t("study.autoPlayTooltip")}
-                onClick={() => setAutoPlaySideB((value) => !value)}
-                className={`flex h-10 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-semibold md:h-12 md:px-3 ${
-                  autoPlaySideB
-                    ? "border-accent bg-accent/10 text-accent"
-                    : "border-border text-muted"
-                }`}
-              >
-                <span aria-hidden="true">
-                  {autoPlaySideB ? "🔊" : "🔇"}
-                </span>
-                {t("study.autoPlay")}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setHelpOpen(true)}
-              aria-label={t("study.tooltip.help")}
-              title={t("study.tooltip.help")}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border text-base font-semibold text-muted md:h-12 md:w-12"
-            >
-              ?
-            </button>
-            <span className="text-sm font-medium tabular-nums">
-              {view.progress.seen} / {view.progress.total}
-            </span>
-          </div>
-        </div>
+      <header className="shrink-0">
+        {/*
+          The active tab is already highlighted in the nav, so the visible
+          title is redundant. Keeping it as `sr-only` preserves the page
+          heading for screen readers without spending vertical space.
+        */}
+        <h1 className="sr-only">{t("common.study")}</h1>
 
         <div className="h-1 w-full overflow-hidden rounded-full bg-surface-2 md:h-1.5">
           <div
@@ -365,7 +335,7 @@ export default function StudyPage() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] md:gap-x-4 md:text-sm">
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] md:gap-x-4 md:text-sm">
           <span className="text-success">✓ {view.metrics.successes}</span>
           <span className="text-danger">✕ {view.metrics.failures}</span>
           <span className="text-accent">
@@ -375,6 +345,9 @@ export default function StudyPage() {
             {t("study.accuracy", {
               value: Math.round(view.metrics.accuracy * 100),
             })}
+          </span>
+          <span className="ml-auto text-muted tabular-nums">
+            {view.progress.seen} / {view.progress.total}
           </span>
         </div>
       </header>
@@ -448,12 +421,44 @@ export default function StudyPage() {
             />
           </div>
 
-          <div className="flex min-h-10 shrink-0 items-center justify-between gap-3 md:min-h-12">
-            <p className="text-[11px] text-muted md:text-xs">
+          <div className="flex min-h-10 shrink-0 items-center justify-between gap-2 md:min-h-12">
+            <div className="flex items-center gap-1.5">
+              {supported && (
+                <button
+                  type="button"
+                  aria-pressed={autoPlaySideB}
+                  aria-label={t("study.autoPlayTooltip")}
+                  title={t("study.autoPlayTooltip")}
+                  onClick={() => setAutoPlaySideB((value) => !value)}
+                  className={`flex h-10 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-semibold md:h-12 md:px-3 ${
+                    autoPlaySideB
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border text-muted"
+                  }`}
+                >
+                  {t("study.autoPlay")}
+                  <span aria-hidden="true">
+                    {autoPlaySideB ? "🔊" : "🔇"}
+                  </span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setHelpOpen(true)}
+                aria-label={t("study.tooltip.help")}
+                title={t("study.tooltip.help")}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-border text-base font-semibold text-muted md:h-12 md:w-12"
+              >
+                ?
+              </button>
+            </div>
+
+            <p className="hidden text-xs text-muted md:mx-auto md:block">
               {view.revealed
                 ? t("study.hintFlipped")
                 : t("study.hintUnflipped")}
             </p>
+
             {view.undoAvailable && (
               <button
                 type="button"
