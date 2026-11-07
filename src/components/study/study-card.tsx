@@ -2,7 +2,7 @@
 
 import { useDrag } from "@use-gesture/react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   StudyCard as StudyCardModel,
   StudyConfig,
@@ -154,7 +154,37 @@ export function StudyCardView({
   const { t } = useI18n();
   const reducedMotion = useReducedMotion();
   const movedRef = useRef(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
+  const [contentOverflow, setContentOverflow] = useState(false);
+
+  // Long descriptions scroll inside the card. When there is nothing to
+  // scroll, the card keeps `touch-none` so vertical swipes always reach the
+  // status gestures instead of being consumed by the browser.
+  useEffect(() => {
+    const element = contentRef.current;
+    if (!element) {
+      return;
+    }
+
+    const update = () => {
+      setContentOverflow(element.scrollHeight > element.clientHeight + 1);
+    };
+
+    update();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    if (element.firstElementChild) {
+      observer.observe(element.firstElementChild);
+    }
+
+    return () => observer.disconnect();
+  }, [flipped, card.id]);
 
   function choose(status: CardStatus) {
     if (!revealed) {
@@ -247,7 +277,7 @@ export function StudyCardView({
       : `translate3d(${drag.x}px, ${drag.y}px, 0) rotate(${drag.x / 24}deg)`;
 
   return (
-    <div className="relative h-[min(62vh,560px)] w-full overflow-hidden">
+    <div className="relative flex min-h-0 w-full flex-1 flex-col justify-center overflow-hidden">
       <div
         {...bind()}
         role="button"
@@ -261,7 +291,7 @@ export function StudyCardView({
             onFlip();
           }
         }}
-        className="relative flex h-full touch-pan-y select-none flex-col overflow-x-hidden rounded-3xl border border-border bg-surface p-4 shadow-xl"
+        className="relative flex h-full max-h-[560px] w-full touch-none select-none flex-col overflow-hidden rounded-3xl border border-border bg-surface p-3 shadow-xl md:p-4"
         style={{
           transform,
           transition: drag.active ? "none" : "transform 200ms ease",
@@ -304,20 +334,27 @@ export function StudyCardView({
             }}
             disabled={busy}
             title={t("study.tooltip.hide")}
-            className="min-h-12 shrink-0 rounded-xl border border-border px-3 text-xs font-medium text-muted disabled:opacity-50"
+            className="min-h-10 shrink-0 rounded-lg border border-border px-2.5 text-[11px] font-medium text-muted disabled:opacity-50 md:min-h-12 md:rounded-xl md:px-3 md:text-xs"
           >
             {t("study.hide")}
           </button>
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-3">
+        <div className="mt-1.5 flex items-center justify-between gap-3">
           <HistoryIcons history={card.history} />
           <span className="text-xs uppercase tracking-[0.15em] text-muted">
             {flipped ? t("study.answer") : t("study.question")}
           </span>
         </div>
 
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-x-hidden overflow-y-auto py-4">
+        <div
+          ref={contentRef}
+          className={`flex min-h-0 flex-1 overflow-x-hidden overflow-y-auto py-2 md:py-4 ${
+            contentOverflow
+              ? "touch-pan-y items-start overscroll-contain"
+              : "touch-none items-center"
+          }`}
+        >
           <div className="w-full overflow-x-hidden [perspective:1000px]">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
@@ -346,34 +383,10 @@ export function StudyCardView({
           onClick={(event) => event.stopPropagation()}
         >
           <div
-            className="grid grid-cols-3 gap-1.5"
+            className="grid grid-cols-4 gap-1.5"
             role="group"
             aria-label={t("study.statusGroup")}
           >
-            {/* <button
-              type="button"
-              onClick={onFlip}
-              disabled={busy}
-              className="flex min-h-12 flex-col items-center justify-center rounded-xl border border-border bg-surface-2 text-[11px] font-medium text-muted disabled:opacity-50"
-              >
-              <span aria-hidden="true" className="text-base leading-none">
-              ⟳
-              </span>
-              {t("study.flip")}
-              </button> */}
-
-            <span aria-hidden="true" />
-            <StatusButton
-              status="learned"
-              icon="🙈"
-              direction={STATUS_DIRECTION.learned}
-              active={card.status === "learned"}
-              busy={busy}
-              onClick={() => choose("learned")}
-            />
-            <span aria-hidden="true" />
-
-            {/* <span aria-hidden="true" /> */}
             <StatusButton
               status="hard"
               icon="❌"
@@ -391,6 +404,16 @@ export function StudyCardView({
               busy={busy}
               onClick={() => choose("new")}
             />
+
+            <StatusButton
+              status="learned"
+              icon="🙈"
+              direction={STATUS_DIRECTION.learned}
+              active={card.status === "learned"}
+              busy={busy}
+              onClick={() => choose("learned")}
+            />
+
             <StatusButton
               status="easy"
               icon="✅"
@@ -399,7 +422,6 @@ export function StudyCardView({
               busy={busy}
               onClick={() => choose("easy")}
             />
-            {/*  <span aria-hidden="true" /> */}
           </div>
         </div>
       </div>
@@ -432,7 +454,7 @@ function StatusButton({
       aria-pressed={active}
       aria-label={`${t(STATUS_KEYS[status])} (${direction})`}
       title={t(STATUS_TOOLTIP_KEYS[status])}
-      className={`flex min-h-12 flex-col items-center justify-center rounded-xl border text-[11px] font-semibold disabled:opacity-50 ${
+      className={`flex min-h-11 flex-col items-center justify-center rounded-xl border text-[11px] font-semibold disabled:opacity-50 md:min-h-12 ${
         active
           ? "border-accent bg-accent/15 text-accent"
           : "border-border bg-surface-2 text-muted"

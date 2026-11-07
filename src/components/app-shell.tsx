@@ -89,8 +89,12 @@ function NavIcon({ name }: { name: NavIconName }) {
 
 /**
  * Persistent navigation shell. On mobile it renders a top bar and a bottom tab
- * bar; from `lg` up it becomes a sidebar with a wide content area. Routes stay
+ * bar; from `md` up it becomes a sidebar with a wide content area. Routes stay
  * real URLs, so back/forward, deep links and the PWA keep working.
+ *
+ * The mobile shell is a fixed viewport: the bars are flex rows and only the
+ * content area scrolls. The study screen opts out of that scroll so card
+ * swipes never fight the page.
  */
 export function AppShell({
   children,
@@ -101,10 +105,14 @@ export function AppShell({
 }) {
   const { t } = useI18n();
   const pathname = usePathname();
+  const isStudy = pathname === "/";
 
   return (
-    <div className="min-h-dvh md:flex">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur md:hidden">
+    <div className="flex h-dvh flex-col overflow-hidden md:h-auto md:min-h-dvh md:flex-row md:overflow-visible">
+      <header
+        className="z-30 flex shrink-0 items-center justify-between gap-2 border-b border-border bg-background/95 px-3 pb-2 backdrop-blur md:hidden"
+        style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)" }}
+      >
         <Link
           href="/"
           className="text-sm font-semibold uppercase tracking-[0.2em] text-muted"
@@ -156,13 +164,21 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex-1 pb-24 md:pb-8">{children}</div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div
+          className={`flex min-h-0 flex-1 flex-col ${
+            isStudy
+              ? "overflow-hidden"
+              : "overflow-y-auto overscroll-contain md:overflow-visible"
+          }`}
+        >
+          {children}
+        </div>
       </div>
 
       <nav
         aria-label={t("nav.main")}
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="z-40 shrink-0 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
         <ul className="grid grid-cols-5">
           {NAV_ITEMS.map((item) => {

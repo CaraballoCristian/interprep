@@ -319,11 +319,11 @@ export default function StudyPage() {
       : Math.round((view.progress.seen / view.progress.total) * 100);
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-4 pt-4 md:max-w-2xl">
-      <header className="space-y-2">
-        <div className="flex items-center justify-between gap-3">
+    <main className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col overflow-hidden px-3 pb-2 pt-2 md:max-w-2xl md:px-4 md:pb-4 md:pt-4">
+      <header className="shrink-0 space-y-2">
+        <div className="flex items-center justify-between gap-2">
           <h1 className="text-base font-semibold">{t("common.study")}</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {supported && (
               <button
                 type="button"
@@ -331,7 +331,7 @@ export default function StudyPage() {
                 aria-label={t("study.autoPlayTooltip")}
                 title={t("study.autoPlayTooltip")}
                 onClick={() => setAutoPlaySideB((value) => !value)}
-                className={`flex h-12 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold ${
+                className={`flex h-10 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-semibold md:h-12 md:px-3 ${
                   autoPlaySideB
                     ? "border-accent bg-accent/10 text-accent"
                     : "border-border text-muted"
@@ -348,7 +348,7 @@ export default function StudyPage() {
               onClick={() => setHelpOpen(true)}
               aria-label={t("study.tooltip.help")}
               title={t("study.tooltip.help")}
-              className="flex h-12 w-12 items-center justify-center rounded-xl border border-border text-base font-semibold text-muted"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border text-base font-semibold text-muted md:h-12 md:w-12"
             >
               ?
             </button>
@@ -358,14 +358,14 @@ export default function StudyPage() {
           </div>
         </div>
 
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-surface-2 md:h-1.5">
           <div
             className="h-full rounded-full bg-accent transition-[width] duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] md:gap-x-4 md:text-sm">
           <span className="text-success">✓ {view.metrics.successes}</span>
           <span className="text-danger">✕ {view.metrics.failures}</span>
           <span className="text-accent">
@@ -382,7 +382,7 @@ export default function StudyPage() {
       {error && (
         <p
           role="alert"
-          className="mt-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-sm"
+          className="mt-2 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-sm"
         >
           {error}
         </p>
@@ -434,7 +434,7 @@ export default function StudyPage() {
         </section>
       ) : view.card ? (
         <>
-          <div className="flex flex-1 flex-col justify-center py-4">
+          <div className="flex min-h-0 flex-1 flex-col justify-center py-2 md:py-4">
             <StudyCardView
               card={view.card}
               config={view.config}
@@ -448,8 +448,8 @@ export default function StudyPage() {
             />
           </div>
 
-          <div className="flex min-h-12 items-center justify-between gap-3">
-            <p className="text-xs text-muted">
+          <div className="flex min-h-10 shrink-0 items-center justify-between gap-3 md:min-h-12">
+            <p className="text-[11px] text-muted md:text-xs">
               {view.revealed
                 ? t("study.hintFlipped")
                 : t("study.hintUnflipped")}
@@ -460,7 +460,7 @@ export default function StudyPage() {
                 onClick={() => void act({ type: "undo" })}
                 disabled={busy}
                 title={t("study.tooltip.undo")}
-                className="min-h-12 shrink-0 rounded-xl border border-border px-4 text-sm font-medium disabled:opacity-50"
+                className="min-h-10 shrink-0 rounded-xl border border-border px-3 text-xs font-medium disabled:opacity-50 md:min-h-12 md:px-4 md:text-sm"
               >
                 {t("study.undo", { count: view.undoCount })}
               </button>
