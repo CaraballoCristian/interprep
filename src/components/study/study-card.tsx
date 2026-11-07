@@ -382,11 +382,28 @@ export function StudyCardView({
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
         >
+          {/*
+            Layout mirrors the arrow keys so the mapping is obvious:
+            ↑ learned on top, then ← hard, ↓ new, → easy.
+          */}
           <div
-            className="grid grid-cols-4 gap-1.5"
+            className="grid grid-cols-3 gap-1.5"
             role="group"
             aria-label={t("study.statusGroup")}
           >
+            <span aria-hidden="true" />
+
+            <StatusButton
+              status="learned"
+              icon="🙈"
+              direction={STATUS_DIRECTION.learned}
+              active={card.status === "learned"}
+              busy={busy}
+              onClick={() => choose("learned")}
+            />
+
+            <span aria-hidden="true" />
+
             <StatusButton
               status="hard"
               icon="❌"
@@ -403,15 +420,6 @@ export function StudyCardView({
               active={card.status === "new"}
               busy={busy}
               onClick={() => choose("new")}
-            />
-
-            <StatusButton
-              status="learned"
-              icon="🙈"
-              direction={STATUS_DIRECTION.learned}
-              active={card.status === "learned"}
-              busy={busy}
-              onClick={() => choose("learned")}
             />
 
             <StatusButton
