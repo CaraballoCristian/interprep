@@ -7,13 +7,25 @@ import type {
   StudyCard as StudyCardModel,
   StudyConfig,
 } from "@lib/study/types";
-import { orderSideFields } from "@lib/study/config";
+import {
+  orderSideFields,
+  STATUS_DIRECTION,
+  EXIT_DURATION_MS,
+  type SwipeDirection,
+} from "@lib/study/config";
 import type { TranslationKey } from "@lib/i18n/dictionary";
 import { type CardResult, type CardStatus, type SideField } from "@lib/types";
 import { SpeakButton } from "@/components/speech/speak-button";
 import { useI18n } from "@/components/settings-provider";
 
 const SWIPE_THRESHOLD = 80;
+
+const EXIT_TRANSFORM: Record<SwipeDirection, string> = {
+  left: "translate3d(-120%, 0, 0) rotate(-8deg)",
+  right: "translate3d(120%, 0, 0) rotate(8deg)",
+  up: "translate3d(0, -120%, 0)",
+  down: "translate3d(0, 120%, 0)",
+};
 
 const STATUS_KEYS: Record<CardStatus, TranslationKey> = {
   new: "status.new",
@@ -34,14 +46,6 @@ const STATUS_TOOLTIP_KEYS: Record<CardStatus, TranslationKey> = {
   easy: "study.tooltip.easy",
   hard: "study.tooltip.hard",
   learned: "study.tooltip.learned",
-};
-
-/** Swipe direction for each status. */
-const STATUS_DIRECTION: Record<CardStatus, "up" | "down" | "left" | "right"> = {
-  learned: "up",
-  new: "down",
-  hard: "left",
-  easy: "right",
 };
 
 function fieldValue(card: StudyCardModel, field: SideField): string {
@@ -134,6 +138,7 @@ type StudyCardProps = {
   flipped: boolean;
   revealed: boolean;
   busy: boolean;
+  exitDirection: SwipeDirection | null;
   onFlip: () => void;
   onHide: () => void;
   onStatusChange: (status: CardStatus) => void;
@@ -146,6 +151,7 @@ export function StudyCardView({
   flipped,
   revealed,
   busy,
+  exitDirection,
   onFlip,
   onHide,
   onStatusChange,
@@ -154,13 +160,32 @@ export function StudyCardView({
   const { t } = useI18n();
   const reducedMotion = useReducedMotion();
   const movedRef = useRef(false);
+  const contentScrolledRef = useRef(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
   const [contentOverflow, setContentOverflow] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  // Long descriptions scroll inside the card. When there is nothing to
-  // scroll, the card keeps `touch-none` so vertical swipes always reach the
-  // status gestures instead of being consumed by the browser.
+  // Reset the finger offset whenever the card changes or the exit animation
+  // finishes, so the next card always starts centered.
+  useEffect(() => {
+    if (!exitDirection) {
+      setDrag({ x: 0, y: 0, active: false });
+    }
+  }, [card.id, exitDirection]);
+
+  // A new side starts collapsed so the card always owns vertical swipes.
+  useEffect(() => {
+    setExpanded(false);
+    if (contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [card.id, flipped]);
+
+  // Long descriptions are clipped until the user asks to read them. While
+  // collapsed the card keeps `touch-none`, so vertical swipes on the text
+  // reach the status gestures instead of being consumed by the browser.
   useEffect(() => {
     const element = contentRef.current;
     if (!element) {
@@ -186,6 +211,91 @@ export function StudyCardView({
     return () => observer.disconnect();
   }, [flipped, card.id]);
 
+  // Chrome treats the text area as a pan surface even when it does not
+  // overflow, which cancels the pointer stream that useDrag listens to.
+  // A non-passive touchmove listener keeps the browser out of the gesture
+  // unless the description is expanded and can actually scroll.
+  useEffect(() => {
+    const cardElement = cardRef.current;
+    if (!cardElement) {
+      return;
+    }
+
+    let startX = 0;
+    let startY = 0;
+    let decided = false;
+    let allowScroll = false;
+    let startedInContent = false;
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.touches.length !== 1) {
+        return;
+      }
+
+      const touch = event.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      decided = false;
+      allowScroll = false;
+      startedInContent =
+        contentRef.current?.contains(event.target as Node) ?? false;
+    };
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (event.touches.length !== 1) {
+        return;
+      }
+
+      const touch = event.touches[0];
+
+      if (!decided) {
+        const dx = touch.clientX - startX;
+        const dy = touch.clientY - startY;
+
+        // Wait for a clear direction, but keep the browser from starting a
+        // scroll before we know whether the card should own the gesture.
+        if (Math.abs(dx) < 4 && Math.abs(dy) < 4) {
+          if (event.cancelable) {
+            event.preventDefault();
+          }
+          return;
+        }
+
+        decided = true;
+
+        const content = contentRef.current;
+        if (
+          expanded &&
+          startedInContent &&
+          content &&
+          Math.abs(dy) >= Math.abs(dx)
+        ) {
+          const canScrollDown =
+            content.scrollTop + content.clientHeight <
+            content.scrollHeight - 1;
+          const canScrollUp = content.scrollTop > 0;
+          allowScroll = dy < 0 ? canScrollDown : canScrollUp;
+
+          if (allowScroll) {
+            contentScrolledRef.current = true;
+          }
+        }
+      }
+
+      if (!allowScroll && event.cancelable) {
+        event.preventDefault();
+      }
+    };
+
+    cardElement.addEventListener("touchstart", onTouchStart, { passive: true });
+    cardElement.addEventListener("touchmove", onTouchMove, { passive: false });
+
+    return () => {
+      cardElement.removeEventListener("touchstart", onTouchStart);
+      cardElement.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [expanded]);
+
   function choose(status: CardStatus) {
     if (!revealed) {
       onNotRevealed();
@@ -197,33 +307,35 @@ export function StudyCardView({
   const bind = useDrag(({ down, movement: [mx, my], last }) => {
     if (down) {
       movedRef.current = false;
+      contentScrolledRef.current = false;
     }
     if (Math.abs(mx) > 6 || Math.abs(my) > 6) {
       movedRef.current = true;
     }
 
-    setDrag({ x: down ? mx : 0, y: down ? my : 0, active: down });
-
     if (!last) {
+      setDrag({ x: down ? mx : 0, y: down ? my : 0, active: down });
       return;
     }
 
+    // The gesture ended. Keep the finger offset when a status is chosen so
+    // the exit animation continues from the current position instead of
+    // snapping back to the center first.
     const horizontal = Math.abs(mx) > Math.abs(my);
     const distance = Math.max(Math.abs(mx), Math.abs(my));
-    if (distance < SWIPE_THRESHOLD) {
+
+    if (distance < SWIPE_THRESHOLD || !revealed || contentScrolledRef.current) {
+      setDrag({ x: 0, y: 0, active: false });
+      if (distance >= SWIPE_THRESHOLD && !revealed) {
+        onNotRevealed();
+      }
       return;
     }
 
-    if (!revealed) {
-      onNotRevealed();
-      return;
-    }
-
-    if (horizontal) {
-      choose(mx > 0 ? "easy" : "hard");
-    } else {
-      choose(my < 0 ? "learned" : "new");
-    }
+    setDrag({ x: mx, y: my, active: false });
+    choose(
+      horizontal ? (mx > 0 ? "easy" : "hard") : my < 0 ? "learned" : "new",
+    );
   });
 
   function handleClick() {
@@ -276,10 +388,20 @@ export function StudyCardView({
       ? undefined
       : `translate3d(${drag.x}px, ${drag.y}px, 0) rotate(${drag.x / 24}deg)`;
 
+  const exitStyle = exitDirection
+    ? {
+        transform: EXIT_TRANSFORM[exitDirection],
+        opacity: 0,
+        pointerEvents: "none" as const,
+        transition: `transform ${EXIT_DURATION_MS}ms ease-in, opacity ${EXIT_DURATION_MS}ms ease-in`,
+      }
+    : null;
+
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col justify-center overflow-hidden">
       <div
         {...bind()}
+        ref={cardRef}
         role="button"
         tabIndex={0}
         aria-label={flipped ? t("study.showQuestion") : t("study.showAnswer")}
@@ -292,10 +414,14 @@ export function StudyCardView({
           }
         }}
         className="relative flex h-full max-h-[560px] w-full touch-none select-none flex-col overflow-hidden rounded-3xl border border-border bg-surface p-3 shadow-xl md:p-4"
-        style={{
-          transform,
-          transition: drag.active ? "none" : "transform 200ms ease",
-        }}
+        style={
+          exitStyle ?? {
+            transform,
+            transition: drag.active
+              ? "none"
+              : "transform 200ms ease, opacity 200ms ease",
+          }
+        }
       >
         {overlay && (
           <div
@@ -342,17 +468,49 @@ export function StudyCardView({
 
         <div className="mt-1.5 flex items-center justify-between gap-3">
           <HistoryIcons history={card.history} />
-          <span className="text-xs uppercase tracking-[0.15em] text-muted">
-            {flipped ? t("study.answer") : t("study.question")}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-[0.15em] text-muted">
+              {flipped ? t("study.answer") : t("study.question")}
+            </span>
+            {contentOverflow && (
+              <button
+                type="button"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setExpanded((value) => {
+                    if (value && contentRef.current) {
+                      contentRef.current.scrollTop = 0;
+                    }
+                    return !value;
+                  });
+                }}
+                className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted"
+              >
+                {expanded ? t("study.showLess") : t("study.showMore")}
+              </button>
+            )}
+          </div>
         </div>
 
         <div
           ref={contentRef}
-          className={`flex min-h-0 flex-1 overflow-x-hidden overflow-y-auto py-2 md:py-4 ${
-            contentOverflow
-              ? "touch-pan-y items-start overscroll-contain"
-              : "touch-none items-center"
+          style={
+            contentOverflow && !expanded
+              ? {
+                  maskImage:
+                    "linear-gradient(to bottom, #000 82%, transparent 100%)",
+                  WebkitMaskImage:
+                    "linear-gradient(to bottom, #000 82%, transparent 100%)",
+                }
+              : undefined
+          }
+          className={`flex min-h-0 flex-1 overflow-x-hidden py-2 md:py-4 ${
+            expanded && contentOverflow
+              ? "touch-pan-y items-start overflow-y-auto overscroll-contain"
+              : contentOverflow
+                ? "touch-none items-start overflow-hidden"
+                : "touch-none items-center overflow-hidden"
           }`}
         >
           <div className="w-full overflow-x-hidden [perspective:1000px]">

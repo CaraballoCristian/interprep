@@ -108,7 +108,7 @@ export function AppShell({
   const isStudy = pathname === "/";
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden md:h-auto md:min-h-dvh md:flex-row md:overflow-visible">
+    <div className="fixed inset-0 flex flex-col overflow-hidden md:static md:h-auto md:min-h-dvh md:flex-row md:overflow-visible">
       <header
         className="z-30 flex shrink-0 items-center justify-between gap-2 border-b border-border bg-background/95 px-3 pb-2 backdrop-blur md:hidden"
         style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)" }}

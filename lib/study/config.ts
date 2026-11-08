@@ -1,5 +1,18 @@
-import type { SideField } from "../types";
+import type { CardStatus, SideField } from "../types";
 import type { StudyConfig } from "./types";
+
+/** Direction a card leaves the screen for each status, mirroring the arrow keys. */
+export type SwipeDirection = "up" | "down" | "left" | "right";
+
+export const STATUS_DIRECTION: Record<CardStatus, SwipeDirection> = {
+  learned: "up",
+  new: "down",
+  hard: "left",
+  easy: "right",
+};
+
+/** Duration of the card exit animation, in milliseconds. */
+export const EXIT_DURATION_MS = 180;
 
 /**
  * Toggles a field on one side of the card. Selecting a field on one side

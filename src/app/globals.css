@@ -46,6 +46,20 @@ body {
   height: 100%;
 }
 
+/*
+ * Mobile uses a fixed app shell instead of a percentage-height document.
+ * Without this, the document can be a few pixels taller than the visible
+ * viewport, which makes Chrome restore a stale scroll offset after a PWA
+ * reload and pushes the header or the bottom nav out of view.
+ */
+@media (max-width: 767px) {
+  html,
+  body {
+    height: auto;
+    overscroll-behavior: none;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

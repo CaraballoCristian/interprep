@@ -57,7 +57,7 @@ export default async function RootLayout({
 
   return (
     <html lang={settings.language} data-theme={settings.theme}>
-      <body className="min-h-dvh antialiased">
+      <body className="antialiased">
         <SettingsProvider
           initialTheme={settings.theme}
           initialLanguage={settings.language}

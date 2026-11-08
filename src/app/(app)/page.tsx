@@ -3,8 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "motion/react";
 import type { StudyAction, StudyView } from "@lib/study/session";
-import { spokenSideField } from "@lib/study/config";
+import {
+  spokenSideField,
+  STATUS_DIRECTION,
+  EXIT_DURATION_MS,
+  type SwipeDirection,
+} from "@lib/study/config";
 import type { CardStatus, SideField } from "@lib/types";
 import { useI18n } from "@/components/settings-provider";
 import { HelpDialog } from "@/components/help-dialog";
@@ -24,8 +30,14 @@ export default function StudyPage() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [autoPlaySideB, setAutoPlaySideB] = useState(false);
   const [preferencesReady, setPreferencesReady] = useState(false);
+  const [exitDirection, setExitDirection] = useState<SwipeDirection | null>(
+    null,
+  );
   const busyRef = useRef(false);
   const loadedRef = useRef(false);
+  const exitingRef = useRef(false);
+  const exitTimerRef = useRef<number | null>(null);
+  const reducedMotion = useReducedMotion();
   const { supported, speak } = useSpeech();
 
   const readError = useCallback(
@@ -168,10 +180,37 @@ export default function StudyPage() {
         setError(t("study.error.notRevealed"));
         return;
       }
-      void act({ type: "status", status });
+
+      if (busyRef.current || exitingRef.current) {
+        return;
+      }
+
+      if (reducedMotion) {
+        void act({ type: "status", status });
+        return;
+      }
+
+      exitingRef.current = true;
+      setExitDirection(STATUS_DIRECTION[status]);
+
+      exitTimerRef.current = window.setTimeout(() => {
+        exitTimerRef.current = null;
+        void act({ type: "status", status }).finally(() => {
+          exitingRef.current = false;
+          setExitDirection(null);
+        });
+      }, EXIT_DURATION_MS);
     },
-    [act, t, view?.revealed],
+    [act, reducedMotion, t, view?.revealed],
   );
+
+  useEffect(() => {
+    return () => {
+      if (exitTimerRef.current !== null) {
+        window.clearTimeout(exitTimerRef.current);
+      }
+    };
+  }, []);
 
   const speakSide = useCallback(
     (fields: SideField[]) => {
@@ -253,7 +292,7 @@ export default function StudyPage() {
         return;
       }
 
-      if (helpOpen || view.resumePending) {
+      if (helpOpen || view.resumePending || exitingRef.current) {
         return;
       }
 
@@ -318,6 +357,8 @@ export default function StudyPage() {
       ? 0
       : Math.round((view.progress.seen / view.progress.total) * 100);
 
+  const exiting = exitDirection !== null;
+
   return (
     <main className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col overflow-hidden px-3 pb-2 pt-2 md:max-w-2xl md:px-4 md:pb-4 md:pt-4">
       <header className="shrink-0">
@@ -328,7 +369,7 @@ export default function StudyPage() {
         */}
         <h1 className="sr-only">{t("common.study")}</h1>
 
-        <div className="h-1 w-full overflow-hidden rounded-full bg-surface-2 md:h-1.5">
+        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-2 md:h-1.5">
           <div
             className="h-full rounded-full bg-accent transition-[width] duration-300"
             style={{ width: `${progressPercent}%` }}
@@ -413,7 +454,8 @@ export default function StudyPage() {
               config={view.config}
               flipped={view.flipped}
               revealed={view.revealed}
-              busy={busy}
+              busy={busy || exiting}
+              exitDirection={exitDirection}
               onFlip={() => void flip()}
               onHide={() => void act({ type: "hide" })}
               onStatusChange={requestStatus}
@@ -463,7 +505,7 @@ export default function StudyPage() {
               <button
                 type="button"
                 onClick={() => void act({ type: "undo" })}
-                disabled={busy}
+                disabled={busy || exiting}
                 title={t("study.tooltip.undo")}
                 className="min-h-10 shrink-0 rounded-xl border border-border px-3 text-xs font-medium disabled:opacity-50 md:min-h-12 md:px-4 md:text-sm"
               >

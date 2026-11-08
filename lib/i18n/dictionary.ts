@@ -168,6 +168,8 @@ const es = {
   "study.showAnswer": "Ver la respuesta",
   "study.showQuestion": "Ver la pregunta",
   "study.noHistory": "Sin historial",
+  "study.showMore": "Ver más",
+  "study.showLess": "Ver menos",
   "study.historyLabel":
     "Historial: {successes} aciertos y {failures} fallos de {total}",
   "study.statusGroup": "Estado de la tarjeta",
@@ -676,6 +678,8 @@ const en: Record<TranslationKey, string> = {
   "study.showAnswer": "Show the answer",
   "study.showQuestion": "Show the question",
   "study.noHistory": "No history",
+  "study.showMore": "Show more",
+  "study.showLess": "Show less",
   "study.historyLabel":
     "History: {successes} hits and {failures} misses out of {total}",
   "study.statusGroup": "Card status",
