@@ -7,6 +7,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import type { DictationConfig } from "../../lib/dictation/types";
+import type { ImportUndoData } from "../../lib/import/undo";
 import {
   CARD_RESULTS,
   CARD_STATUSES,
@@ -170,6 +171,26 @@ export const sessionState = sqliteTable(
   (table) => [uniqueIndex("session_state_user_unique").on(table.userId)],
 );
 
+/**
+ * Snapshot of the most recent import for a user, used by the "undo import"
+ * action. One row per user; a new import replaces the previous snapshot.
+ */
+export const importUndo = sqliteTable(
+  "import_undo",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    deckId: text("deck_id")
+      .notNull()
+      .references(() => decks.id, { onDelete: "cascade" }),
+    data: text("data", { mode: "json" }).$type<ImportUndoData>().notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("import_undo_user_unique").on(table.userId)],
+);
+
 export type Deck = typeof decks.$inferSelect;
 export type NewDeck = typeof decks.$inferInsert;
 export type Card = typeof cards.$inferSelect;
@@ -178,3 +199,4 @@ export type Template = typeof templates.$inferSelect;
 export type NewTemplate = typeof templates.$inferInsert;
 export type Settings = typeof settings.$inferSelect;
 export type SessionState = typeof sessionState.$inferSelect;
+export type ImportUndo = typeof importUndo.$inferSelect;

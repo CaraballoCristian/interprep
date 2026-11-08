@@ -136,6 +136,20 @@ const es = {
   "import.importing": "Importando…",
   "import.reimport": "Reimportar",
   "import.import": "Importar",
+  "import.undo.button": "Deshacer importación",
+  "import.undo.bannerTitle": "Última importación pendiente de deshacer",
+  "import.undo.bannerDescription":
+    'Nuevas: {inserted} · Actualizadas: {updated} · Mazo: "{name}".',
+  "import.undo.confirmTitle": "Deshacer importación",
+  "import.undo.confirmDescription":
+    'Se van a borrar las tarjetas nuevas ({inserted}) y se restaurarán las actualizadas ({updated}) del mazo "{name}" a su contenido anterior. Las tarjetas editadas después de la importación también se restaurarán.',
+  "import.undo.confirm": "Deshacer",
+  "import.undo.success":
+    "Importación deshecha. Tarjetas borradas: {deleted}. Tarjetas restauradas: {restored}.",
+  "import.undo.notFound": "Ya no hay una importación para deshacer.",
+  "import.undo.conflict":
+    "No se pudo deshacer porque hay tarjetas nuevas que usan los mismos términos.",
+  "import.undo.error": "No se pudo deshacer la importación.",
 
   "study.error.notRevealed": "Girá la tarjeta antes de evaluar.",
   "study.error.undoUnavailable": "No hay acciones para deshacer.",
@@ -646,6 +660,20 @@ const en: Record<TranslationKey, string> = {
   "import.importing": "Importing…",
   "import.reimport": "Reimport",
   "import.import": "Import",
+  "import.undo.button": "Undo import",
+  "import.undo.bannerTitle": "Last import available to undo",
+  "import.undo.bannerDescription":
+    'New: {inserted} · Updated: {updated} · Deck: "{name}".',
+  "import.undo.confirmTitle": "Undo import",
+  "import.undo.confirmDescription":
+    'New cards ({inserted}) will be deleted and updated cards ({updated}) in the deck "{name}" will be restored to their previous content. Cards edited after the import will also be restored.',
+  "import.undo.confirm": "Undo",
+  "import.undo.success":
+    "Import undone. Cards deleted: {deleted}. Cards restored: {restored}.",
+  "import.undo.notFound": "There is no import left to undo.",
+  "import.undo.conflict":
+    "The import could not be undone because new cards use the same terms.",
+  "import.undo.error": "The import could not be undone.",
 
   "study.error.notRevealed": "Flip the card before rating it.",
   "study.error.undoUnavailable": "There are no actions to undo.",

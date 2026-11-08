@@ -8,13 +8,14 @@ import type {
   CardUpdate,
   ExistingCard,
 } from "@lib/import/plan";
+import type { ImportUndoData } from "@lib/import/undo";
 import type { LibraryCard } from "@lib/library/types";
 import { matchKey as buildMatchKey } from "@lib/normalize";
 import type { CardSnapshot } from "@lib/study/history";
 import type { StudyCard } from "@lib/study/types";
 import type { CardResult, CardStatus } from "@lib/types";
 import { getDb } from "../client";
-import { cards } from "../schema";
+import { cards, importUndo } from "../schema";
 
 const INSERT_CHUNK_SIZE = 200;
 
@@ -102,6 +103,11 @@ export type ApplyImportResult = {
 /**
  * Applies an import plan atomically. New cards get default status/history
  * values; existing cards keep status, hidden flag, history and counters.
+ *
+ * The previous content of every updated card and the ids of every inserted
+ * card are stored as the user's single "undo import" snapshot. A new import
+ * replaces the previous snapshot; an import that changes nothing leaves it
+ * untouched.
  */
 export function applyImportPlan(
   userId: string,
@@ -115,26 +121,54 @@ export function applyImportPlan(
   const now = new Date().toISOString();
 
   db.transaction((tx) => {
+    const updateIds = plan.updates.map((update) => update.id);
+    const previous: ImportUndoData["updates"] = [];
+
+    for (let i = 0; i < updateIds.length; i += INSERT_CHUNK_SIZE) {
+      const chunk = updateIds.slice(i, i + INSERT_CHUNK_SIZE);
+      const rows = tx
+        .select({
+          id: cards.id,
+          termEng: cards.termEng,
+          termEsp: cards.termEsp,
+          category: cards.category,
+          description: cards.description,
+          matchKey: cards.matchKey,
+        })
+        .from(cards)
+        .where(and(eq(cards.userId, userId), inArray(cards.id, chunk)))
+        .all();
+
+      previous.push(...rows);
+    }
+
+    const insertedIds: string[] = [];
+
     for (let i = 0; i < plan.inserts.length; i += INSERT_CHUNK_SIZE) {
       const chunk = plan.inserts
         .slice(i, i + INSERT_CHUNK_SIZE)
-        .map((card) => ({
-          id: crypto.randomUUID(),
-          userId,
-          deckId,
-          category: card.category,
-          termEng: card.termEng,
-          termEsp: card.termEsp,
-          description: card.description,
-          status: "new" as const,
-          hidden: false,
-          history: [] as CardResult[],
-          totalSuccess: 0,
-          totalFail: 0,
-          matchKey: card.matchKey,
-          createdAt: now,
-          updatedAt: now,
-        }));
+        .map((card) => {
+          const id = crypto.randomUUID();
+          insertedIds.push(id);
+
+          return {
+            id,
+            userId,
+            deckId,
+            category: card.category,
+            termEng: card.termEng,
+            termEsp: card.termEsp,
+            description: card.description,
+            status: "new" as const,
+            hidden: false,
+            history: [] as CardResult[],
+            totalSuccess: 0,
+            totalFail: 0,
+            matchKey: card.matchKey,
+            createdAt: now,
+            updatedAt: now,
+          };
+        });
 
       tx.insert(cards).values(chunk).run();
     }
@@ -149,6 +183,21 @@ export function applyImportPlan(
           updatedAt: now,
         })
         .where(and(eq(cards.userId, userId), eq(cards.id, update.id)))
+        .run();
+    }
+
+    if (plan.inserts.length > 0 || plan.updates.length > 0) {
+      tx.delete(importUndo)
+        .where(eq(importUndo.userId, userId))
+        .run();
+      tx.insert(importUndo)
+        .values({
+          id: userId,
+          userId,
+          deckId,
+          data: { insertedIds, updates: previous },
+          createdAt: now,
+        })
         .run();
     }
   });

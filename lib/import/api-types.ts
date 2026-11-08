@@ -1,5 +1,6 @@
 import type { ColumnMapping, ImportField } from "./headers";
 import type { ImportCounts, ImportRow, ImportRowError } from "./preview";
+import type { ImportUndoSummary } from "./undo";
 
 export type ImportPlanSummary = {
   inserts: number;
@@ -33,4 +34,6 @@ export type ImportCommitResponse = {
   preserved: number;
   skippedErrors: number;
   duplicateRows: number;
+  /** Present when this import created a new undo snapshot. */
+  undo: ImportUndoSummary | null;
 };

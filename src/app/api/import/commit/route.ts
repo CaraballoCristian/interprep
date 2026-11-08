@@ -3,7 +3,7 @@ import { errorResponse } from "@/server/api-errors";
 import { requireUser } from "@/server/auth";
 import { resolveDeckId } from "@/server/decks";
 import { applyImportPlan } from "@/db/repositories/cards";
-import { analyzeImport } from "@/server/import";
+import { analyzeImport, getUndoSummary } from "@/server/import";
 import { importRequestSchema } from "@/server/validation";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +53,10 @@ export async function POST(request: Request) {
     }
 
     const result = applyImportPlan(user.id, analysis.plan, deckId);
+    const undo =
+      result.inserted + result.updated > 0
+        ? getUndoSummary(user.id)
+        : null;
 
     const response: ImportCommitResponse = {
       inserted: result.inserted,
@@ -61,6 +65,7 @@ export async function POST(request: Request) {
       preserved: analysis.plan.preserved,
       skippedErrors: analysis.preview.errors.length,
       duplicateRows: analysis.plan.duplicateRows,
+      undo,
     };
 
     return Response.json(response);

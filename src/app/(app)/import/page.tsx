@@ -18,7 +18,12 @@ import {
   type ImportField,
 } from "@lib/import/headers";
 import type { ImportErrorReason } from "@lib/import/preview";
+import type {
+  ImportUndoResponse,
+  ImportUndoSummary,
+} from "@lib/import/undo";
 import type { TranslationKey } from "@lib/i18n/dictionary";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PageHeading } from "@/components/page-heading";
 import { useI18n } from "@/components/settings-provider";
 
@@ -52,8 +57,12 @@ export default function ImportPage() {
   const [headerRowInput, setHeaderRowInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [result, setResult] = useState<ImportCommitResponse | null>(null);
   const [resultDeckName, setResultDeckName] = useState<string | null>(null);
+  const [undo, setUndo] = useState<ImportUndoSummary | null>(null);
+  const [undoBusy, setUndoBusy] = useState(false);
+  const [confirmUndo, setConfirmUndo] = useState(false);
 
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [decksLoading, setDecksLoading] = useState(true);
@@ -103,6 +112,31 @@ export default function ImportPage() {
       cancelled = true;
     };
   }, [t]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/import/undo", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          return;
+        }
+        const body = (await response.json().catch(() => null)) as {
+          undo?: ImportUndoSummary | null;
+        } | null;
+
+        if (!cancelled) {
+          setUndo(body?.undo ?? null);
+        }
+      })
+      .catch(() => {
+        // The banner is optional; a failed lookup should not block importing.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function deckError(code: string | undefined): string {
     switch (code) {
@@ -160,6 +194,7 @@ export default function ImportPage() {
 
     setBusy(true);
     setError(null);
+    setNotice(null);
     setResult(null);
 
     const headerRow = options?.headerRow ?? preview?.headerRow;
@@ -202,6 +237,7 @@ export default function ImportPage() {
 
     setBusy(true);
     setError(null);
+    setNotice(null);
 
     try {
       const response = await fetch("/api/import/commit", {
@@ -224,11 +260,10 @@ export default function ImportPage() {
         decks.find((deck) => deck.id === deckId)?.name ?? null,
       );
       setResult(data);
+      setUndo(data.undo ?? null);
       setPreview(null);
       setMapping(null);
       setHeaderRowInput("");
-      setContent("");
-      setFileName(null);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : t("import.error.import"),
@@ -252,6 +287,7 @@ export default function ImportPage() {
     setHeaderRowInput("");
     setResult(null);
     setError(null);
+    setNotice(null);
   }
 
   function reset() {
@@ -263,6 +299,7 @@ export default function ImportPage() {
     setResult(null);
     setResultDeckName(null);
     setError(null);
+    setNotice(null);
   }
 
   function onDeckChange(value: string) {
@@ -270,6 +307,7 @@ export default function ImportPage() {
     setResult(null);
     setResultDeckName(null);
     setError(null);
+    setNotice(null);
 
     if (preview) {
       void analyze({
@@ -277,6 +315,57 @@ export default function ImportPage() {
         ...(mapping ? { mapping } : {}),
         headerRow: preview.headerRow,
       });
+    }
+  }
+
+  async function runUndo() {
+    if (undoBusy) {
+      return;
+    }
+
+    setUndoBusy(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/import/undo", {
+        method: "POST",
+      });
+      const body = (await response.json().catch(() => null)) as
+        | (ImportUndoResponse & { error?: string })
+        | null;
+
+      if (!response.ok || !body || body.error !== undefined) {
+        const code = body?.error;
+        throw new Error(
+          code === "undo_not_found"
+            ? t("import.undo.notFound")
+            : code === "undo_conflict"
+              ? t("import.undo.conflict")
+              : t("import.undo.error"),
+        );
+      }
+
+      setUndo(null);
+      setResult(null);
+      setResultDeckName(null);
+      setPreview(null);
+      setMapping(null);
+      setHeaderRowInput("");
+      setConfirmUndo(false);
+      setNotice(
+        t("import.undo.success", {
+          deleted: body.deleted,
+          restored: body.restored,
+        }),
+      );
+    } catch (cause) {
+      setConfirmUndo(false);
+      setError(
+        cause instanceof Error ? cause.message : t("import.undo.error"),
+      );
+    } finally {
+      setUndoBusy(false);
     }
   }
 
@@ -348,6 +437,40 @@ export default function ImportPage() {
     <main className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6">
       <PageHeading title={t("import.title")} />
 
+      {notice && (
+        <p
+          role="status"
+          className="mb-4 rounded-xl border border-success/40 bg-success/10 px-3 py-2 text-sm"
+        >
+          {notice}
+        </p>
+      )}
+
+      {!result && undo && (
+        <section className="mb-4 flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">
+              {t("import.undo.bannerTitle")}
+            </p>
+            <p className="mt-0.5 text-xs text-muted">
+              {t("import.undo.bannerDescription", {
+                inserted: undo.inserted,
+                updated: undo.updated,
+                name: undo.deckName,
+              })}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setConfirmUndo(true)}
+            disabled={undoBusy}
+            className="min-h-12 shrink-0 rounded-xl border border-danger/40 px-4 text-sm font-medium text-danger disabled:opacity-50"
+          >
+            {t("import.undo.button")}
+          </button>
+        </section>
+      )}
+
       {result ? (
         <section className="space-y-4 rounded-2xl border border-border bg-surface p-4">
           <div>
@@ -397,6 +520,16 @@ export default function ImportPage() {
             >
               {t("common.study")}
             </Link>
+            {undo && (
+              <button
+                type="button"
+                onClick={() => setConfirmUndo(true)}
+                disabled={undoBusy}
+                className="min-h-12 rounded-xl border border-danger/40 px-5 text-sm font-medium text-danger disabled:opacity-50"
+              >
+                {t("import.undo.button")}
+              </button>
+            )}
           </div>
         </section>
       ) : (
@@ -768,6 +901,25 @@ export default function ImportPage() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmUndo && undo !== null}
+        title={t("import.undo.confirmTitle")}
+        description={
+          undo
+            ? t("import.undo.confirmDescription", {
+                inserted: undo.inserted,
+                updated: undo.updated,
+                name: undo.deckName,
+              })
+            : undefined
+        }
+        confirmLabel={t("import.undo.confirm")}
+        tone="danger"
+        busy={undoBusy}
+        onConfirm={() => void runUndo()}
+        onCancel={() => setConfirmUndo(false)}
+      />
     </main>
   );
 }
